@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
+  <title id="title">Logo bệnh viện</title>
+  <desc id="desc">Biểu trưng y tế hình tròn với dấu thập đỏ và hoa sen</desc>
+  <circle cx="120" cy="120" r="116" fill="#fff" stroke="#55a9d3" stroke-width="4"/>
+  <circle cx="120" cy="120" r="91" fill="#4b9dca" stroke="#fff" stroke-width="3"/>
+  <path d="M29 154h182v47H29z" fill="#df6b2c"/>
+  <path d="M120 67v70M85 102h70" stroke="#e91e2b" stroke-width="25" stroke-linecap="square"/>
+  <path d="M120 155c-4 9-5 17-4 25-11-16-24-21-38-18 10 4 18 11 24 22h36c6-11 14-18 24-22-14-3-27 2-38 18 1-8 0-16-4-25z" fill="#fff"/>
+  <text x="120" y="34" fill="#1c3277" font-family="Arial,sans-serif" font-size="14" font-weight="700" text-anchor="middle">BỘ Y TẾ</text>
+  <text x="120" y="183" fill="#fff" font-family="Arial,sans-serif" font-size="12" font-weight="700" text-anchor="middle">1958</text>
+</svg>
