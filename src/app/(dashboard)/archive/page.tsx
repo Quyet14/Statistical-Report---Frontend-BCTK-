@@ -27,25 +27,26 @@ export default function ArchivePage() {
   }, [fromDate, query, tasks, toDate]);
 
   return (
-    <div>
+    <div className="dashboard-page" data-page="archive">
       <div className="page-header">
         <div>
           <span className="eyebrow">Tra cứu vận hành</span>
           <h3 className="page-title">Lưu trữ việc đã hoàn thành</h3>
+          <p className="page-description">Lưu giữ kết quả, tra cứu nhanh và kết nối thông tin công việc.</p>
         </div>
         <span className="status-badge success">{archivedTasks.length} hồ sơ</span>
       </div>
 
       <div className="panel-card archive-filter-card">
-        <input
+        <label className="filter-field">Tìm kiếm hồ sơ<input
           className="archive-search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Tìm theo tên việc, người phụ trách, khoa/phòng..."
           aria-label="Tìm kiếm task đã hoàn thành"
-        />
-        <input className="date-input" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} aria-label="Từ ngày" />
-        <input className="date-input" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} aria-label="Đến ngày" />
+        /></label>
+        <label className="filter-field">Từ ngày<input className="date-input" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} aria-label="Từ ngày" /></label>
+        <label className="filter-field">Đến ngày<input className="date-input" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} aria-label="Đến ngày" /></label>
       </div>
 
       <div className="panel-card table-card">

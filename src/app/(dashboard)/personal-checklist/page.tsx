@@ -88,7 +88,7 @@ export default function PersonalChecklistPage() {
   };
 
   return (
-    <div className="personal-page">
+    <div className="dashboard-page personal-page" data-page="personal">
       <div className="page-header personal-header">
         <div>
           <span className="eyebrow">Không gian riêng tư</span>

@@ -178,11 +178,12 @@ export default function ReportsPage() {
   };
 
   return (
-    <div>
+    <div className="dashboard-page" data-page="reports">
       <div className="page-header">
         <div>
           <span className="eyebrow">Thông tin chi tiết</span>
           <h3 className="page-title">Báo cáo kết quả</h3>
+          <p className="page-description">Nhìn rõ bức tranh vận hành, nhận diện xu hướng và đưa ra quyết định kịp thời.</p>
         </div>
 
         <div className="toolbar">

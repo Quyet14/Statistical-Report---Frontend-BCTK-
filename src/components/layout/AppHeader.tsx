@@ -1,10 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { clearTokens, getStoredUser } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { useTasks } from "@/context/TaskContext";
+import { BellOutlined, SearchOutlined, PlusOutlined } from "@ant-design/icons";
+import { WorkspaceSculpture } from "@/components/common/WorkspaceSculpture";
 
 const defaultForm = {
   title: "",
@@ -46,6 +48,17 @@ const addDays = (date: Date, days: number) => {
 
 export function AppHeader() {
   const router = useRouter();
+  const headerRef = useRef<HTMLElement>(null);
+  const [isCompact, setIsCompact] = useState(false);
+  useEffect(() => {
+    // Dashboard pages scroll inside this panel, rather than the browser window.
+    const scrollPanel = headerRef.current?.closest<HTMLElement>(".dashboard-main");
+    if (!scrollPanel) return;
+    const updateHeader = () => setIsCompact(scrollPanel.scrollTop > 24);
+    updateHeader();
+    scrollPanel.addEventListener("scroll", updateHeader, { passive: true });
+    return () => scrollPanel.removeEventListener("scroll", updateHeader);
+  }, []);
   const { tasks, addTask } = useTasks();
   const [currentUser, setCurrentUser] = useState<ReturnType<typeof getStoredUser>>(() => getStoredUser());
   useEffect(() => {
@@ -171,21 +184,22 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="topbar">
+      <header ref={headerRef} className={`workspace-masthead${isCompact ? " is-compact" : ""}`} aria-label="Không gian làm việc Bệnh viện Hữu Nghị">
+      <div className="topbar">
         <div className="topbar-title-group">
-          <h2 className="topbar-title">BỆNH VIỆN HỮU NGHỊ</h2>
+          <p className="topbar-title">BỆNH VIỆN HỮU NGHỊ</p>
           <span className="topbar-subtitle">VietNam-HuuNghi Hospital</span>
         </div>
 
         <div className="topbar-actions">
           <div className="search-box">
-            <span className="search-icon">⌕</span>
+            <SearchOutlined className="search-icon" aria-hidden="true" />
             <input
               type="text"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Tìm việc, nhân sự, khoa/phòng..."
-              aria-label="Search"
+              aria-label="Tìm công việc, nhân sự, khoa phòng"
             />
             {normalizedSearch ? (
               <div className="search-results" role="listbox" aria-label="Kết quả tìm kiếm">
@@ -206,7 +220,7 @@ export function AppHeader() {
 
           {currentUser?.role === "admin" || currentUser?.role === "manager" ? (
             <button className="primary-action" type="button" onClick={() => setIsOpen(true)}>
-              ＋ Giao việc
+              <PlusOutlined aria-hidden="true" /> Giao việc
             </button>
           ) : null}
 
@@ -215,9 +229,10 @@ export function AppHeader() {
               className="icon-button"
               type="button"
               aria-label="Thông báo"
+              aria-expanded={isNotificationsOpen}
               onClick={() => setIsNotificationsOpen((current) => !current)}
             >
-              🔔 {unreadNotificationCount ? <span className="notif-dot">{unreadNotificationCount}</span> : null}
+              <BellOutlined aria-hidden="true" /> {unreadNotificationCount ? <span className="notif-dot">{unreadNotificationCount}</span> : null}
             </button>
 
             {isNotificationsOpen ? (
@@ -258,7 +273,7 @@ export function AppHeader() {
               aria-expanded={isUserMenuOpen}
               onClick={() => setIsUserMenuOpen((current) => !current)}
             >
-              <span className="user-badge">A</span>
+              <span className="user-badge">{currentUser?.name?.trim().split(/\s+/).slice(-1)[0]?.[0]?.toUpperCase() ?? "U"}</span>
               <span>{currentUser?.name ?? "Người dùng"}</span>
             </button>
 
@@ -272,7 +287,18 @@ export function AppHeader() {
           </div>
 
         </div>
+      </div>
       </header>
+      <div className="workspace-banner">
+        <section className="workspace-hero" aria-labelledby="workspace-welcome">
+          <div className="workspace-hero-copy">
+            <span className="hero-kicker"><span /> KHÔNG GIAN LÀM VIỆC · HUUNGHI CAREOPS</span>
+            <h2 id="workspace-welcome">Một ngày hiệu quả.<br /><em>Cùng nhau tạo khác biệt.</em></h2>
+            <p>Sắp xếp công việc rõ ràng, kết nối đội ngũ và dành trọn tâm huyết cho những điều quan trọng.</p>
+          </div>
+          <div className="masthead-art"><WorkspaceSculpture /></div>
+        </section>
+      </div>
 
       {isOpen ? (
         <div className="modal-backdrop" onClick={() => setIsOpen(false)}>

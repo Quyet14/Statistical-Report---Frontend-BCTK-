@@ -5,6 +5,7 @@ import { useEffect, useState, type DragEvent } from "react";
 import { useTasks } from "@/context/TaskContext";
 import { getStoredUser, type CurrentUser } from "@/lib/auth";
 import type { TaskStatus } from "@/types";
+import { CheckCircleOutlined, ClockCircleOutlined, PlayCircleOutlined } from "@ant-design/icons";
 
 const getLocalDate = () => {
   const now = new Date();
@@ -72,9 +73,9 @@ export default function ChecklistPage() {
     return date >= new Date(weekStart.toDateString()) && date <= new Date(weekEnd.toDateString());
   });
   const summaryCards = [
-    { label: "Hoàn thành", value: visibleTasks.filter((task) => task.status === "done").length, tone: "green" },
-    { label: "Đang làm", value: visibleTasks.filter((task) => task.status === "doing").length, tone: "blue" },
-    { label: "Chưa bắt đầu", value: visibleTasks.filter((task) => task.status === "todo").length, tone: "red" },
+    { label: "Hoàn thành", value: visibleTasks.filter((task) => task.status === "done").length, tone: "green", icon: CheckCircleOutlined, hint: "Đã hoàn tất công việc" },
+    { label: "Đang làm", value: visibleTasks.filter((task) => task.status === "doing").length, tone: "blue", icon: PlayCircleOutlined, hint: "Đang được triển khai" },
+    { label: "Chưa bắt đầu", value: visibleTasks.filter((task) => task.status === "todo").length, tone: "red", icon: ClockCircleOutlined, hint: "Sẵn sàng để bắt đầu" },
   ];
 
   const moveTaskToStatus = (taskId: string, status: TaskStatus) => {
@@ -91,7 +92,7 @@ export default function ChecklistPage() {
   };
 
   return (
-    <div>
+    <div className="dashboard-page" data-page="checklist">
       <div className="page-header">
         <div>
           <span className="eyebrow">Tổng quan vận hành</span>
@@ -102,21 +103,22 @@ export default function ChecklistPage() {
           <select className="soft-select" value={filter} onChange={(event) => { const value = event.target.value as "today" | "week" | "all"; setFilter(value); window.localStorage.setItem("checklist-range", value); }} aria-label="Chọn khoảng thời gian">
             <option value="today">Hôm nay</option>
             <option value="week">Tuần này</option>
-            <option value="all">Tất cả task</option>
+            <option value="all">Tất cả công việc</option>
           </select>
-          <span className="status-badge success">{summaryCards[0].value} hoàn thành</span>
         </div>
       </div>
 
       <div className="stats-grid">
         {summaryCards.map((item) => (
           <div key={item.label} className={`stat-card ${item.tone}`}>
+            <span className="stat-icon"><item.icon aria-hidden="true" /></span>
             <span className="stat-label">{item.label}</span>
             <div className="stat-value">{item.value}</div>
           </div>
         ))}
       </div>
 
+      <div className="board-heading" id="work-board"><h3>Bảng công việc</h3></div>
       <div className="kanban-board">
         {kanbanColumns.map((column) => {
           const columnTasks = visibleTasks.filter((task) => task.status === column.status);

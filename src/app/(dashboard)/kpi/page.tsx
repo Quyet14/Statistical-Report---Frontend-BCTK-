@@ -73,15 +73,22 @@ export default function KpiPage() {
   }, []);
 
   return (
-    <div>
+    <div className="dashboard-page" data-page="kpi">
       <div className="page-header">
         <div>
           <span className="eyebrow">Hiệu suất</span>
           <h3 className="page-title">Xếp hạng KPI</h3>
+          <p className="page-description">Ghi nhận đóng góp, theo dõi hiệu suất và cùng đội ngũ tiến bộ mỗi ngày.</p>
         </div>
       </div>
 
-      <div className="panel-card table-card">
+      <div className="stats-grid">
+        <div className="stat-card blue"><span className="stat-label">Nhân sự trong bảng xếp hạng</span><div className="stat-value">{data.length}</div><span className="stat-hint">Tổng hợp trong tháng</span></div>
+        <div className="stat-card violet"><span className="stat-label">KPI trung bình</span><div className="stat-value">{data.length ? Math.round(data.reduce((sum, row) => sum + row.kpi, 0) / data.length) : "—"}</div><span className="stat-hint">Điểm trung bình của đội ngũ</span></div>
+        <div className="stat-card green"><span className="stat-label">Đạt từ 100 điểm</span><div className="stat-value">{data.filter((row) => row.kpi >= 100).length}</div><span className="stat-hint">Nhân sự hoàn thành mục tiêu</span></div>
+      </div>
+      <div className="panel-card table-card kpi-table">
+        <div className="section-header"><h4>Bảng xếp hạng tháng</h4><span>{data.length} nhân sự</span></div>
         <table className="modern-table">
           <thead>
             <tr>
@@ -95,7 +102,7 @@ export default function KpiPage() {
           <tbody>
             {data.map((row) => (
               <tr key={`${row.staff}-${row.rank}`}>
-                <td>{row.rank}</td>
+                <td><span className={`rank-badge rank-${row.rank <= 3 ? row.rank : "other"}`}>{row.rank}</span></td>
                 <td>{row.staff}</td>
                 <td>{row.department}</td>
                 <td>{row.kpi}</td>
@@ -106,6 +113,7 @@ export default function KpiPage() {
                 </td>
               </tr>
             ))}
+            {!data.length ? <tr><td colSpan={5} className="empty-table-state">Chưa có dữ liệu xếp hạng trong tháng này.</td></tr> : null}
           </tbody>
         </table>
       </div>

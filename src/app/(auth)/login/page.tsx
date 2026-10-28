@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { login, saveTokens, saveUser, verifyLoginOtp } from "@/lib/auth";
 import { PasswordField } from "@/components/common/PasswordField";
+import { WorkspaceSculpture } from "@/components/common/WorkspaceSculpture";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -84,6 +85,7 @@ export default function LoginPage() {
       <section className="auth-aside">
         <div className="auth-aside-content">
           <div className="auth-kicker">QUẢN LÝ CÔNG VIỆC</div>
+          <WorkspaceSculpture />
           <h2>
              <span>Làm việc rõ ràng</span>
             <span>Hiệu suất bền vững</span>
@@ -96,7 +98,7 @@ export default function LoginPage() {
         <div className="auth-card">
           <div className="auth-card-header">
             <Image className="auth-logo" src="/hospital-logo.png" alt="Logo bệnh viện" width={72} height={72} priority />
-            <div className="auth-brand">ViecPro</div>
+            <div className="auth-brand">HuuNghi CareOps</div>
             <h1>{step === "login" ? "Chào mừng trở lại" : "Xác minh đăng nhập"}</h1>
             <p className="auth-card-subtitle">
               {step === "login"

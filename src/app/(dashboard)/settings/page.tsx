@@ -93,22 +93,13 @@ export default function SettingsPage() {
   };
 
   return (
-    <div>
+    <div className="dashboard-page" data-page="settings">
       <div className="page-header">
-        <div><span className="eyebrow">Cấu hình</span><h3 className="page-title">Người dùng và phòng ban</h3></div>
+        <div><span className="eyebrow">Cấu hình</span><h3 className="page-title">Người dùng và phòng ban</h3><p className="page-description">Kết nối đội ngũ, tổ chức phòng ban và quản lý quyền truy cập trong cùng một nơi.</p></div>
         {message ? <span className="status-badge success">{message}</span> : null}
-      </div>
-
-      <div className="settings-grid">
-        <div className="panel-card setting-card">
-          <h4>Người dùng</h4>
-          <p className="setting-content">Tạo tài khoản và phân quyền người dùng.</p>
+        <div className="toolbar">
           <button className="primary-action" type="button" onClick={() => { setEditingUserId(null); setIsUserFormOpen(true); }}>＋ Tạo người dùng</button>
-        </div>
-        <div className="panel-card setting-card">
-          <h4>Phòng ban</h4>
-          <p className="setting-content">Tạo phòng ban để gán cho người dùng.</p>
-          <button className="primary-action" type="button" onClick={() => { setEditingDepartmentId(null); setIsDepartmentFormOpen(true); }}>＋ Tạo phòng ban</button>
+          <button className="secondary-action" type="button" onClick={() => { setEditingDepartmentId(null); setIsDepartmentFormOpen(true); }}>＋ Tạo phòng ban</button>
         </div>
       </div>
 
