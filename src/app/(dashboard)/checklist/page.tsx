@@ -77,6 +77,7 @@ export default function ChecklistPage() {
     { label: "Đang làm", value: visibleTasks.filter((task) => task.status === "doing").length, tone: "blue", icon: PlayCircleOutlined, hint: "Đang được triển khai" },
     { label: "Chưa bắt đầu", value: visibleTasks.filter((task) => task.status === "todo").length, tone: "red", icon: ClockCircleOutlined, hint: "Sẵn sàng để bắt đầu" },
   ];
+  const completionRate = visibleTasks.length ? Math.round(summaryCards[0].value / visibleTasks.length * 100) : 0;
 
   const moveTaskToStatus = (taskId: string, status: TaskStatus) => {
     const task = tasks.find((item) => item.id === taskId);
@@ -118,7 +119,13 @@ export default function ChecklistPage() {
         ))}
       </div>
 
-      <div className="board-heading" id="work-board"><h3>Bảng công việc</h3></div>
+      <div className="board-heading" id="work-board">
+        <h3>Bảng công việc</h3>
+        <div className="board-summary">
+          <span>{visibleTasks.length} công việc · {completionRate}% hoàn thành</span>
+          <div className="board-progress" role="progressbar" aria-label="Tỷ lệ công việc hoàn thành" aria-valuemin={0} aria-valuemax={100} aria-valuenow={completionRate}><span style={{ width: `${completionRate}%` }} /></div>
+        </div>
+      </div>
       <div className="kanban-board">
         {kanbanColumns.map((column) => {
           const columnTasks = visibleTasks.filter((task) => task.status === column.status);
@@ -171,12 +178,12 @@ export default function ChecklistPage() {
                             progress: progressByStatus[nextStatus],
                           });
                         }}
-                        onUpdate={canManage ? (id, update) => { void updateTask(id, update); } : undefined}
-                        onDelete={canManage ? (id) => { void deleteTask(id); } : undefined}
+                        onUpdate={canManage ? updateTask : undefined}
+                        onDelete={canManage ? deleteTask : undefined}
                       />
                     </div>
                   );
-                }) : <div className="kanban-empty">Không có task</div>}
+                }) : <div className="kanban-empty">Chưa có công việc trong cột này</div>}
               </div>
             </section>
           );

@@ -4,6 +4,8 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { api } from "@/lib/api";
 import { getStoredUser, type CurrentUser } from "@/lib/auth";
 import type { TaskItem, TaskPriority, TaskStatus } from "@/types";
+import { useFeedback } from "@/context/FeedbackContext";
+import { taskOutcomeFeedback } from "@/lib/feedback";
 
 export type TaskDraft = {
   title: string;
@@ -18,12 +20,12 @@ export type TaskDraft = {
 
 type TaskContextValue = {
   tasks: TaskItem[];
-  addTask: (task: TaskDraft) => Promise<void>;
-  updateTask: (id: string, update: Partial<TaskDraft>) => Promise<void>;
-  deleteTask: (id: string) => Promise<void>;
-  completeTask: (id: string) => Promise<void>;
-  updateChecklistItem: (taskId: string, itemId: number, completed: boolean) => Promise<void>;
-  addChecklistItem: (taskId: string, title: string) => Promise<void>;
+  addTask: (task: TaskDraft) => Promise<boolean>;
+  updateTask: (id: string, update: Partial<TaskDraft>) => Promise<boolean>;
+  deleteTask: (id: string) => Promise<boolean>;
+  completeTask: (id: string) => Promise<boolean>;
+  updateChecklistItem: (taskId: string, itemId: number, completed: boolean) => Promise<boolean>;
+  addChecklistItem: (taskId: string, title: string) => Promise<boolean>;
 };
 
 type RawChecklistItem = { id: number; title: string; completed: boolean };
@@ -99,6 +101,7 @@ const TaskContext = createContext<TaskContextValue | undefined>(undefined);
 
 export function TaskProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const { runAction } = useFeedback();
 
   useEffect(() => {
     const loadTasks = async () => {
@@ -154,13 +157,15 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       checklist: task.checklistTitles?.map((item) => item.trim()).filter(Boolean),
     };
 
-    const createdTask = await api.post<RawTask>("/tasks", payload);
-    setTasks((currentTasks) => [normalizeTask(createdTask), ...currentTasks]);
+    const result = await runAction(() => api.post<RawTask>("/tasks", payload), { title: "Đã giao công việc", description: task.title.trim() });
+    if (!result.ok) return false;
+    setTasks((currentTasks) => [normalizeTask(result.value), ...currentTasks]);
+    return true;
   };
 
   const updateTask = async (id: string, update: Partial<TaskDraft>) => {
     const currentTask = tasks.find((task) => task.id === id);
-    if (!currentTask) return;
+    if (!currentTask) return false;
     const nextState = normalizeTaskState(update.status ?? currentTask.status, update.progress ?? currentTask.progress);
 
     const nextTask = {
@@ -184,43 +189,58 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       progress: nextTask.progress,
     };
 
-    await api.patch(`/tasks/${id}`, payload);
+    const result = await runAction(() => api.patch(`/tasks/${id}`, payload), taskOutcomeFeedback(currentTask.status, nextTask.status, nextTask.title));
+    if (!result.ok) return false;
     setTasks((currentTasks) =>
       currentTasks.map((task) => (task.id === id ? nextTask : task)),
     );
+    return true;
   };
 
   const updateChecklistItem = async (taskId: string, itemId: number, completed: boolean) => {
-    const result = await api.patch<Partial<RawTask>>(`/tasks/${taskId}/checklist/${itemId}`, { completed });
+    const currentTask = tasks.find((task) => task.id === taskId);
+    const response = await runAction(() => api.patch<Partial<RawTask>>(`/tasks/${taskId}/checklist/${itemId}`, { completed }), (result) => {
+      const state = normalizeTaskState(result.status ?? currentTask?.status, result.progress ?? currentTask?.progress);
+      return taskOutcomeFeedback(currentTask?.status, state.status, currentTask?.title, completed ? "Đã hoàn thành mục công việc" : "Đã mở lại mục công việc");
+    });
+    if (!response.ok) return false;
+    const result = response.value;
     setTasks((currentTasks) => currentTasks.map((task) => task.id === taskId
       ? (() => {
         const state = normalizeTaskState(result.status ?? task.status, result.progress ?? task.progress);
         return { ...task, status: state.status, progress: state.progress, checklist: task.checklist?.map((item) => item.id === itemId ? { ...item, completed } : item) };
       })()
       : task));
+    return true;
   };
 
   const addChecklistItem = async (taskId: string, title: string) => {
-    const item = await api.post<RawChecklistItem & Partial<RawTask>>(`/tasks/${taskId}/checklist`, { title: title.trim() });
+    const response = await runAction(() => api.post<RawChecklistItem & Partial<RawTask>>(`/tasks/${taskId}/checklist`, { title: title.trim() }), { title: "Đã thêm mục công việc", description: title.trim() });
+    if (!response.ok) return false;
+    const item = response.value;
     setTasks((currentTasks) => currentTasks.map((task) => task.id === taskId
       ? (() => {
         const state = normalizeTaskState(item.status ?? task.status, item.progress ?? task.progress);
         return { ...task, status: state.status, progress: state.progress, checklist: [...(task.checklist ?? []), item] };
       })()
       : task));
+    return true;
   };
 
   const deleteTask = async (id: string) => {
-    await api.del(`/tasks/${id}`);
+    const currentTask = tasks.find((task) => task.id === id);
+    const result = await runAction(() => api.del(`/tasks/${id}`), { title: "Đã xóa công việc", description: currentTask?.title, kind: "info" });
+    if (!result.ok) return false;
     setTasks((currentTasks) => currentTasks.filter((task) => task.id !== id));
+    return true;
   };
 
   const completeTask = async (id: string) => {
     const currentTask = tasks.find((task) => task.id === id);
-    if (!currentTask) return;
+    if (!currentTask) return false;
 
     const nextStatus = currentTask.status === "done" ? "todo" : "done";
-    await updateTask(id, {
+    return updateTask(id, {
       status: nextStatus,
       progress: nextStatus === "done" ? 100 : 50,
     });
@@ -236,7 +256,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       updateChecklistItem,
       addChecklistItem,
     }),
-    [tasks],
+    [tasks, runAction],
   );
 
   return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;

@@ -5,11 +5,13 @@ import { AppHeader } from "@/components/layout/AppHeader";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { TaskProvider } from "@/context/TaskContext";
 import { InteractiveSurfaces } from "@/components/layout/InteractiveSurfaces";
+import { FeedbackProvider } from "@/context/FeedbackContext";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <RequireAuth>
       <RoleGate>
+        <FeedbackProvider>
         <TaskProvider>
           <div className="dashboard-shell">
             <AppSidebar />
@@ -24,6 +26,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </div>
           </div>
         </TaskProvider>
+        </FeedbackProvider>
       </RoleGate>
     </RequireAuth>
   );

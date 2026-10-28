@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { UserOutlined, ApartmentOutlined, CalendarOutlined, PlusOutlined, RightOutlined } from "@ant-design/icons";
+import { formatTaskDate, priorityLabels } from "@/lib/presentation";
 
 type TaskCardProps = {
   id: string;
@@ -13,11 +15,11 @@ type TaskCardProps = {
   priority?: "Low" | "Medium" | "High";
   extra?: ReactNode;
   onToggleComplete?: (id: string, nextStatus: "todo" | "doing" | "done") => void;
-  onUpdate?: (id: string, update: { title: string; assignee: string; time: string; status: "todo" | "doing" | "done"; priority: "Low" | "Medium" | "High"; progress: number }) => void;
-  onDelete?: (id: string) => void;
+  onUpdate?: (id: string, update: { title: string; assignee: string; time: string; status: "todo" | "doing" | "done"; priority: "Low" | "Medium" | "High"; progress: number }) => void | Promise<boolean>;
+  onDelete?: (id: string) => void | Promise<boolean>;
   checklist?: { id: number; title: string; completed: boolean }[];
   onToggleChecklist?: (taskId: string, itemId: number, completed: boolean) => void;
-  onAddChecklist?: (taskId: string, title: string) => void;
+  onAddChecklist?: (taskId: string, title: string) => void | Promise<boolean>;
   department?: string;
 };
 
@@ -53,11 +55,13 @@ export function TaskCard({
   const [draftProgress, setDraftProgress] = useState(progress);
   const [newChecklistTitle, setNewChecklistTitle] = useState("");
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [pending, setPending] = useState<"save" | "add" | "delete" | null>(null);
 
-  const saveTitle = (event: FormEvent<HTMLFormElement>) => {
+  const saveTitle = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!draftTitle.trim()) return;
-    onUpdate?.(id, {
+    if (pending || !draftTitle.trim()) return;
+    setPending("save");
+    const saved = await onUpdate?.(id, {
       title: draftTitle.trim(),
       assignee: draftAssignee.trim(),
       time: draftTime,
@@ -65,18 +69,21 @@ export function TaskCard({
       priority: draftPriority,
       progress: draftProgress,
     });
-    setIsEditing(false);
+    setPending(null);
+    if (saved !== false) setIsEditing(false);
   };
 
-  const addChecklist = (event: FormEvent<HTMLFormElement>) => {
+  const addChecklist = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!newChecklistTitle.trim()) return;
-    onAddChecklist?.(id, newChecklistTitle.trim());
-    setNewChecklistTitle("");
+    if (pending || !newChecklistTitle.trim()) return;
+    setPending("add");
+    const saved = await onAddChecklist?.(id, newChecklistTitle.trim());
+    setPending(null);
+    if (saved !== false) setNewChecklistTitle("");
   };
 
   return (
-    <article className="task-card">
+    <article className={`task-card task-status-${status}`}>
       {extra ? <div className="task-extra">{extra}</div> : null}
 
       <div className="task-card-body">
@@ -87,6 +94,7 @@ export function TaskCard({
             onToggleComplete?.(id, status === "done" ? "todo" : "done")
           }
           className="task-checkbox"
+          aria-label={`Đánh dấu hoàn thành: ${title}`}
         />
 
         <div className="task-card-content">
@@ -96,17 +104,19 @@ export function TaskCard({
           </div>
 
           <div className="task-meta">
-            <span>{assignee}</span>
-            <span className="meta-dot" />
-            <span>{department ?? "Chưa có phòng ban"}</span>
-            <span className="meta-dot" />
-            <span>{time}</span>
-            <span className={`priority-tag priority-${priority.toLowerCase()}`}>{priority}</span>
+            <span className="task-meta-person"><UserOutlined aria-hidden="true" />{assignee}</span>
+            <span className="task-meta-department"><ApartmentOutlined aria-hidden="true" />{department ?? "Chưa có phòng ban"}</span>
           </div>
-
+          <div className="task-schedule">
+            <span className="task-due-date"><CalendarOutlined aria-hidden="true" /><time dateTime={time.match(/^\d{4}-\d{2}-\d{2}/)?.[0]}>{formatTaskDate(time)}</time></span>
+            <span className={`priority-tag priority-${priority.toLowerCase()}`}>{priorityLabels[priority]}</span>
+          </div>
           <div className="task-progress-row">
             <span>Tiến độ</span>
             <strong>{progress}%</strong>
+          </div>
+          <div className="progress-track" role="progressbar" aria-label={`Tiến độ ${title}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
+            <span style={{ width: `${progress}%` }} className={`progress-bar ${status}`} />
           </div>
 
           {checklist.length > 0 ? (
@@ -120,14 +130,13 @@ export function TaskCard({
             </div>
           ) : null}
 
-          <form className="task-checklist-add" onSubmit={addChecklist}>
-            <input value={newChecklistTitle} onChange={(event) => setNewChecklistTitle(event.target.value)} placeholder="Thêm công việc trong task..." aria-label="Thêm công việc checklist" />
-            <button type="submit" className="mini-action edit">Thêm</button>
-          </form>
-
-          <div className="progress-track" aria-label={`Progress ${progress}%`}>
-            <span style={{ width: `${progress}%` }} className={`progress-bar ${status}`} />
-          </div>
+          {onAddChecklist ? <details className="task-add-details">
+            <summary><PlusOutlined aria-hidden="true" /><span>Thêm mục công việc</span><RightOutlined className="task-add-chevron" aria-hidden="true" /></summary>
+            <form className="task-checklist-add" onSubmit={addChecklist}>
+              <input value={newChecklistTitle} onChange={(event) => setNewChecklistTitle(event.target.value)} placeholder="Nhập nội dung..." aria-label="Nội dung mục công việc mới" required />
+              <button type="submit" className="mini-action edit" disabled={pending === "add"}>{pending === "add" ? "Đang lưu..." : "Thêm"}</button>
+            </form>
+          </details> : null}
 
           <div className="task-actions">
             {onUpdate ? <button type="button" className="mini-action edit" onClick={() => { setDraftTitle(title); setDraftAssignee(assignee); setDraftTime(time); setDraftStatus(status); setDraftPriority(priority); setDraftProgress(progress); setIsEditing(true); }}>
@@ -173,7 +182,7 @@ export function TaskCard({
               </div>
               <div className="task-edit-actions">
                 <button type="button" className="secondary-action" onClick={() => setIsEditing(false)}>Hủy</button>
-                <button type="submit" className="primary-action">Lưu thay đổi</button>
+                <button type="submit" className="primary-action" disabled={pending === "save"}>{pending === "save" ? "Đang lưu..." : "Lưu thay đổi"}</button>
               </div>
             </form>
           </div>
@@ -187,7 +196,13 @@ export function TaskCard({
             <p>Bạn có chắc muốn xoá <strong>{title}</strong>? Thao tác này sẽ xoá task khỏi danh sách hiện tại.</p>
             <div className="task-modal-actions">
               <button type="button" className="secondary-action" onClick={() => setIsConfirmingDelete(false)}>Huỷ</button>
-              <button type="button" className="danger-action" onClick={() => { onDelete?.(id); setIsConfirmingDelete(false); }}>Xoá task</button>
+              <button type="button" className="danger-action" disabled={pending === "delete"} onClick={async () => {
+                if (pending) return;
+                setPending("delete");
+                const deleted = await onDelete?.(id);
+                setPending(null);
+                if (deleted !== false) setIsConfirmingDelete(false);
+              }}>{pending === "delete" ? "Đang xóa..." : "Xóa công việc"}</button>
             </div>
           </div>
         </div>

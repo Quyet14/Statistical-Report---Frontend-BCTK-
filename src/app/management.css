@@ -1,0 +1,46 @@
+.management-directory { padding: 18px; }
+.management-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; }
+.management-toolbar h2 { margin: 0 0 4px; color: #3a537d; font-size: 17px; font-weight: 750; }
+.management-toolbar > div > span { font-size: 12px; color: #7386a3; }
+.management-filters { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.management-search { display: flex; align-items: center; gap: 8px; min-width: 200px; padding-inline: 11px; border: 1px solid #e1e8f4; border-radius: 10px; background: #f8fafe; color: #91a1bb; }
+.management-search input { min-width: 0; width: 100%; height: 42px; border: 0; outline: 0; background: none; font-size: 13px; color: #445d81; }
+.management-search:focus-within { border-color: #a6bde5; box-shadow: 0 0 0 3px #527fd70c; }
+.management-filters .soft-select { height: 42px; font-size: 12px; }
+.management-table { table-layout: auto; min-width: 800px; }
+.management-table .staff-cell { align-items: center; }
+.management-table .staff-cell strong { font-size: 14px; font-weight: 650; color: #3b547d; }
+.management-email { display: block; margin-top: 3px; color: #7c8da6; font-size: 12px; font-weight: 400; overflow-wrap: anywhere; }
+.management-table .table-actions { max-width: none; flex-wrap: wrap; }
+.management-table th:last-child { width: 225px; }
+.management-table .table-status { font-size: 11px; }
+.management-role, .management-count { display: inline-block; padding: 4px 8px; border-radius: 7px; background: #f1f4fa; color: #647b9e; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.management-role.role-admin { color: #8062ad; background: #f3edfc; }
+.management-role.role-manager { color: #396ca1; background: #eaf3fc; }
+.management-count { color: #548a7c; background: #edf7f2; }
+.management-muted { color: #93a2b9; font-size: 12px; }
+.management-dialog { position: fixed; inset: 0; margin: auto; width: min(510px, calc(100vw - 28px)); max-height: calc(100dvh - 36px); overflow-y: auto; padding: 22px; border: 1px solid #ffffffc9; border-radius: 21px; background: #fff; color: #415b7f; box-shadow: 0 26px 80px #102f3b38; }
+.management-dialog::backdrop { background: #1a334d66; backdrop-filter: blur(5px); }
+.management-dialog-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid #edf1f7; }
+.management-dialog-header h2 { margin: 0; font-size: 21px; font-weight: 750; color: #385587; letter-spacing: -.02em; }
+.management-form { display: grid; gap: 15px; }
+.management-form label { display: grid; gap: 7px; color: #5b7294; font-size: 13px; font-weight: 650; }
+.management-form input, .management-form select { width: 100%; min-width: 0; height: 44px; padding: 0 12px; border: 1px solid #dde6f2; border-radius: 10px; background: #fafcff; color: #415a7d; font: inherit; font-size: 15px; font-weight: 400; }
+.management-form input:focus, .management-form select:focus { outline: 2px solid #a9c1ee; outline-offset: 1px; }
+.management-form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.management-dialog-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 8px; padding-top: 16px; border-top: 1px solid #edf1f7; }
+.management-dialog-actions .primary-action { border: 1px solid #5a78d5; background: linear-gradient(110deg, #466fd6, #665bc3); box-shadow: inset 0 1px #ffffff40, 0 3px 0 #4055a0; color: #fff; font: inherit; font-size: 13px; font-weight: 650; }
+.management-dialog-actions .secondary-action { background: #f0f3f9; color: #667c9f; font: inherit; font-size: 13px; }
+.management-dialog-actions button:disabled, .management-page button:disabled { opacity: .6; cursor: not-allowed; }
+.management-scope-note { padding: 12px 14px; margin: 0; border: 1px solid #e0ebe9; border-radius: 10px; background: #f5faf8; color: #5c8178; font-size: 13px; line-height: 1.8; }
+.management-delete-copy { font-size: 14px; line-height: 1.9; color: #627796; overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  .management-toolbar { align-items: stretch; }
+  .management-filters { width: 100%; }
+  .management-search { width: 100%; }
+  .management-filters .soft-select { flex: 1; }
+  .management-directory { padding: 14px; }
+  .management-dialog { padding: 18px; }
+}
+@media (max-width: 420px) { .management-form-row { grid-template-columns: 1fr; } }
+@media print { .management-dialog, .management-filters { display: none !important; } .management-directory .table-scroll { overflow: visible; } }

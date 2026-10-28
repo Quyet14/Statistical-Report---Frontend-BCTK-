@@ -142,17 +142,35 @@ async function sendOtpEmail(to, otp) {
   return true;
 }
 
-const requireAuth = (req, res, next) => {
+const requireAuth = async (req, res, next) => {
   const authorization = req.headers.authorization || '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
   if (!token) return res.status(401).json({ message: 'Vui lòng đăng nhập' });
   try {
-    req.user = jwt.verify(token, jwtSecret);
-    next();
-  } catch {
-    res.status(401).json({ message: 'Phiên đăng nhập không hợp lệ' });
+    const payload = jwt.verify(token, jwtSecret);
+    if (typeof payload === 'string' || payload.type === 'refresh' || !Number.isInteger(Number(payload.sub)) || Number(payload.sub) <= 0) {
+      return res.status(401).json({ message: 'Phiên đăng nhập không hợp lệ' });
+    }
+    const [rows] = await pool.query('SELECT id, name, email, role, departmentId, isActive FROM users WHERE id = ? LIMIT 1', [Number(payload.sub)]);
+    const user = rows[0];
+    if (!user || !user.isActive) return res.status(401).json({ message: 'Tài khoản không còn hoạt động' });
+    req.user = { ...user, sub: user.id };
+    return next();
+  } catch (error) {
+    const invalidToken = error instanceof jwt.JsonWebTokenError;
+    res.status(invalidToken ? 401 : 503).json({ message: invalidToken ? 'Phiên đăng nhập không hợp lệ' : 'Không thể xác nhận quyền truy cập lúc này' });
   }
 };
+
+const requireAdmin = (req, res, next) => {
+  if (req.user.role?.toLowerCase() !== 'admin') return res.status(403).json({ message: 'Bạn không có quyền quản lý tài khoản' });
+  return next();
+};
+
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  const { id, name, email, role, departmentId } = req.user;
+  res.json({ id, name, email, role, departmentId: departmentId ?? null });
+});
 
 app.post('/api/auth/login', async (req, res) => {
   try {
@@ -434,7 +452,7 @@ app.get('/api/users/:id', async (req, res) => {
   }
 });
 
-app.post('/api/users', async (req, res) => {
+app.post('/api/users', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { name, email, password, role = 'staff', departmentId } = req.body;
     const passwordHash = await bcrypt.hash(String(password), 12);
@@ -448,7 +466,7 @@ app.post('/api/users', async (req, res) => {
   }
 });
 
-app.patch('/api/users/:id', async (req, res) => {
+app.patch('/api/users/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const fields = [];
     const values = [];
@@ -469,7 +487,7 @@ app.patch('/api/users/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/users/:id', async (req, res) => {
+app.delete('/api/users/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const [result] = await pool.query('DELETE FROM users WHERE id = ?', [req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ message: 'User not found' });
@@ -518,24 +536,25 @@ app.delete('/api/departments/:id', async (req, res) => {
   }
 });
 
-app.get('/api/kpi', requireAuth, async (req, res) => {
+app.get(['/api/kpi', '/api/kpi/ranking'], requireAuth, async (req, res) => {
   try {
     const [userRows] = await pool.query('SELECT role, departmentId FROM users WHERE id = ? LIMIT 1', [req.user.sub]);
     const currentUser = userRows[0];
-    const isDepartmentHead = currentUser?.role?.toLowerCase() === 'manager';
+    const role = currentUser?.role?.toLowerCase();
+    if (role !== 'admin' && role !== 'manager') return res.status(403).json({ message: 'Bạn không có quyền xem KPI' });
+    const isDepartmentHead = role === 'manager';
     if (isDepartmentHead && currentUser.departmentId == null) return res.json([]);
     const departmentFilter = isDepartmentHead ? 'WHERE u.departmentId = ?' : '';
     const departmentParams = isDepartmentHead ? [currentUser.departmentId] : [];
     const [rows] = await pool.query(`
-      SELECT u.id, u.name, d.name AS department,
+      SELECT u.id, u.id AS userId, u.name, u.departmentId, d.name AS department,
              COALESCE(ROUND(SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) * 100 / NULLIF(COUNT(t.id), 0)), 0) AS score
       FROM users u
       LEFT JOIN departments d ON d.id = u.departmentId
       LEFT JOIN tasks t ON t.assigneeId = u.id
       ${departmentFilter}
-      GROUP BY u.id, u.name, d.name
+      GROUP BY u.id, u.name, u.departmentId, d.name
       ORDER BY score DESC, u.name
-      LIMIT 10
     `, departmentParams);
     res.json(rows);
   } catch (error) {

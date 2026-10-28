@@ -28,7 +28,7 @@ export function InteractiveSurfaces({ children }: { children: ReactNode }) {
       if (!motion.matches || event.pointerType !== "mouse" || event.buttons) return reset();
       const target = event.target instanceof Element ? event.target : null;
       const card = target?.closest<HTMLElement>(".stat-card, .task-card");
-      if (!card || !root.contains(card) || target?.closest("button, a, input, select, textarea, [role='dialog']")) return reset();
+      if (!card || !root.contains(card) || target?.closest("button, a, input, select, textarea, summary, [role='dialog']")) return reset();
       if (active !== card) {
         reset();
         active = card;

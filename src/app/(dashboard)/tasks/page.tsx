@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useTasks } from "@/context/TaskContext";
+import { SummaryCard } from "@/components/common/SummaryCard";
+import { CheckCircleOutlined, ClockCircleOutlined, PlayCircleOutlined, CalendarOutlined, DownOutlined } from "@ant-design/icons";
+import { formatTaskDate, priorityLabels } from "@/lib/presentation";
 
 const getLocalDate = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const monthNames = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"];
@@ -24,9 +27,9 @@ export default function TasksPage() {
     return matchesDepartment && matchesStatus;
   });
   const stats = [
-    { label: "Nhiệm vụ đang mở", value: visibleTasks.filter((task) => task.status !== "done").length, tint: "blue" },
-    { label: "Chưa bắt đầu", value: visibleTasks.filter((task) => task.status === "todo").length, tint: "red" },
-    { label: "Hoàn thành", value: visibleTasks.filter((task) => task.status === "done").length, tint: "green" },
+    { label: "Đang làm", value: visibleTasks.filter((task) => task.status === "doing").length, tint: "blue" as const, icon: PlayCircleOutlined },
+    { label: "Chưa bắt đầu", value: visibleTasks.filter((task) => task.status === "todo").length, tint: "red" as const, icon: ClockCircleOutlined },
+    { label: "Hoàn thành", value: visibleTasks.filter((task) => task.status === "done").length, tint: "green" as const, icon: CheckCircleOutlined },
   ];
   const monthStart = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1);
   const firstDayOffset = (monthStart.getDay() + 6) % 7;
@@ -49,18 +52,15 @@ export default function TasksPage() {
 
       <div className="stats-grid">
         {stats.map((item) => (
-          <div key={item.label} className={`stat-card ${item.tint}`}>
-            <span className="stat-label">{item.label}</span>
-            <div className="stat-value">{item.value}</div>
-          </div>
+          <SummaryCard key={item.label} label={item.label} value={item.value} tone={item.tint} icon={<item.icon />} />
         ))}
       </div>
 
       <div className="panel-card table-card">
         <div className="task-filter-bar">
           <div>
-            <strong>Bộ lọc nhiệm vụ</strong>
-            <span>{visibleTasks.length}/{dateFilteredTasks.length} task đang hiển thị</span>
+            <strong>Danh sách nhiệm vụ</strong>
+            <span>{visibleTasks.length}/{dateFilteredTasks.length} công việc đang hiển thị</span>
           </div>
           <div className="toolbar">
             <select className="soft-select" value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} aria-label="Lọc theo phòng ban">
@@ -75,6 +75,8 @@ export default function TasksPage() {
             </select>
           </div>
         </div>
+        <details className="task-calendar-disclosure">
+          <summary><CalendarOutlined aria-hidden="true" /><span>{selectedDate ? `Lọc theo ngày ${formatTaskDate(selectedDate)}` : "Xem lịch công việc"}</span><DownOutlined className="disclosure-chevron" aria-hidden="true" /></summary>
         <div className="task-calendar-bar">
           <div className="personal-calendar task-calendar">
             <div className="personal-calendar-header">
@@ -96,18 +98,10 @@ export default function TasksPage() {
             <strong>{selectedDate ? `Nhiệm vụ ngày ${selectedDate.split("-").reverse().join("/")}` : "Tất cả nhiệm vụ"}</strong>
             <span>{visibleTasks.length} nhiệm vụ</span>
             {selectedDate ? <button type="button" className="secondary-action" onClick={() => setSelectedDate(null)}>Xem tất cả ngày</button> : null}
-            {selectedDate && visibleTasks.length ? (
-              <div className="task-calendar-items">
-                {visibleTasks.map((task) => (
-                  <button key={task.id} type="button" className="task-calendar-item" onClick={() => setSelectedTaskId(task.id)}>
-                    <span>{task.title}</span>
-                    <small>{task.assignee} · {task.status === "done" ? "Hoàn thành" : task.status === "doing" ? "Đang làm" : "Chờ xử lý"}</small>
-                  </button>
-                ))}
-              </div>
-            ) : null}
+            <span>Chọn ngày trên lịch để lọc danh sách bên dưới.</span>
           </div>
         </div>
+        </details>
         <table className="modern-table">
           <thead>
             <tr>
@@ -120,8 +114,8 @@ export default function TasksPage() {
           </thead>
           <tbody>
             {visibleTasks.length ? visibleTasks.map((task) => (
-              <tr key={task.id} className="clickable-row" onClick={() => setSelectedTaskId(task.id)}>
-                <td>{task.title}</td>
+              <tr key={task.id}>
+                <td><button type="button" className="table-title-button" onClick={() => setSelectedTaskId(task.id)}>{task.title}</button></td>
                 <td>{task.departmentName ?? task.department ?? "Chưa có phòng ban"}</td>
                 <td>{task.assignee}</td>
                 <td>
@@ -129,9 +123,9 @@ export default function TasksPage() {
                     {task.status === "done" ? "Hoàn thành" : task.status === "doing" ? "Đang làm" : "Chờ xử lý"}
                   </span>
                 </td>
-                <td>{task.time}</td>
+                <td>{formatTaskDate(task.dueDate ?? task.time)}</td>
               </tr>
-            )) : <tr><td colSpan={5} className="empty-table-state">Không có task được hiển thị cho tài khoản này.</td></tr>}
+            )) : <tr><td colSpan={5} className="empty-table-state">Chưa có công việc phù hợp với bộ lọc.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -151,8 +145,8 @@ export default function TasksPage() {
               <div className="task-detail-item"><span>Phòng ban</span><strong>{selectedTask.departmentName ?? selectedTask.department ?? "Chưa có phòng ban"}</strong></div>
               <div className="task-detail-item"><span>Người phụ trách</span><strong>{selectedTask.assignee}</strong></div>
               <div className="task-detail-item"><span>Trạng thái</span><strong>{selectedTask.status === "done" ? "Hoàn thành" : selectedTask.status === "doing" ? "Đang làm" : "Chưa bắt đầu"}</strong></div>
-              <div className="task-detail-item"><span>Hạn chót</span><strong>{selectedTask.time}</strong></div>
-              <div className="task-detail-item"><span>Mức độ ưu tiên</span><strong>{selectedTask.priority}</strong></div>
+              <div className="task-detail-item"><span>Hạn chót</span><strong>{formatTaskDate(selectedTask.dueDate ?? selectedTask.time)}</strong></div>
+              <div className="task-detail-item"><span>Mức độ ưu tiên</span><strong>{priorityLabels[selectedTask.priority]}</strong></div>
               <div className="task-detail-item"><span>Tiến độ</span><strong>{selectedTask.progress}%</strong></div>
             </div>
 

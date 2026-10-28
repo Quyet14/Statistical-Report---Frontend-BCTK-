@@ -1,3 +1,12 @@
+import { API_BASE_URL } from "./api";
+
+export class AuthRequestError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = "AuthRequestError";
+  }
+}
+
 export type LoginResponse = {
   message: string;
   email: string;
@@ -28,8 +37,6 @@ export type ResetPasswordResponse = {
   email: string;
 };
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3010").replace(/\/$/, "");
-
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   let response: Response;
 
@@ -55,7 +62,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       // Ignore JSON parse errors and keep fallback message.
     }
 
-    throw new Error(errorMessage);
+    throw new AuthRequestError(errorMessage, response.status);
   }
 
   const text = await response.text();
@@ -118,26 +125,32 @@ export function saveUser(user: CurrentUser) {
 
 export function getStoredUser(): CurrentUser | null {
   if (typeof window === "undefined") return null;
-  const value = localStorage.getItem("currentUser");
-  const token = localStorage.getItem("accessToken");
-  const storedUser = value ? JSON.parse(value) as CurrentUser : null;
-  if (!token) return storedUser;
-
   try {
-    const payload = JSON.parse(window.atob(token.split(".")[1])) as Partial<CurrentUser> & { sub?: number };
-    if (!payload.role || !payload.email || !payload.sub) return storedUser;
-    const user = {
-      id: payload.sub,
-      email: payload.email,
-      name: storedUser?.name ?? payload.name ?? payload.email,
-      role: payload.role,
-      departmentId: storedUser?.departmentId ?? payload.departmentId,
-      departmentName: storedUser?.departmentName ?? payload.departmentName,
-    };
-    saveUser(user);
-    return user;
+    const value = localStorage.getItem("currentUser");
+    const user = value ? JSON.parse(value) as CurrentUser : null;
+    return user && Number.isFinite(user.id) && typeof user.role === "string" ? user : null;
   } catch {
     return null;
+  }
+}
+
+export async function refreshCurrentUser(): Promise<CurrentUser> {
+  const token = getStoredToken();
+  if (!token) throw new AuthRequestError("Vui lòng đăng nhập", 401);
+  try {
+    const user = await request<CurrentUser>("/auth/me", {
+      cache: "no-store",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!Number.isFinite(user.id) || !user.email || !user.role) {
+      throw new Error("Máy chủ trả về thông tin tài khoản không hợp lệ.");
+    }
+    // Current database role and department replace cached values, including null.
+    saveUser(user);
+    return user;
+  } catch (error) {
+    if (error instanceof AuthRequestError && (error.status === 401 || error.status === 403)) clearTokens();
+    throw error;
   }
 }
 
@@ -158,5 +171,12 @@ export function getStoredToken() {
     return null;
   }
 
-  return localStorage.getItem("accessToken");
+  const token = localStorage.getItem("accessToken");
+  if (token) return token;
+  const cookie = document.cookie.split("; ").find((item) => item.startsWith("accessToken="))?.slice("accessToken=".length);
+  try {
+    return cookie ? decodeURIComponent(cookie) : null;
+  } catch {
+    return null;
+  }
 }

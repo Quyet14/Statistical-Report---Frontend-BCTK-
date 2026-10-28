@@ -3,6 +3,8 @@ import "antd/dist/reset.css";
 import "./globals.css";
 import "./premium.css";
 import "./dashboard.css";
+import "./feedback.css";
+import "./management.css";
 
 export const metadata: Metadata = {
   title: "Việc Pro | Hệ thống quản lý và Vận hành",

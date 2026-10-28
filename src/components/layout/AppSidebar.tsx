@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getStoredUser } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { canAccessRoute } from "@/lib/access";
 import { CalendarOutlined, CheckSquareOutlined, ApartmentOutlined, InboxOutlined, BarChartOutlined, RiseOutlined, TeamOutlined, AppstoreOutlined, SettingOutlined, DownOutlined } from "@ant-design/icons";
 
 const menuItems = [
@@ -15,12 +16,13 @@ const menuItems = [
   { key: "/archive", label: "Lưu trữ", icon: InboxOutlined },
   { key: "/reports", label: "Giao ban", icon: BarChartOutlined },
   { key: "/kpi", label: "KPI", icon: RiseOutlined },
-  { key: "/settings", label: "Nhân sự/phòng ban", icon: TeamOutlined },
+  { key: "/employees", label: "Quản lý nhân viên", icon: TeamOutlined },
+  { key: "/departments", label: "Quản lý khoa/phòng", icon: ApartmentOutlined },
 ];
 
 const menuGroups = [
   { id: "work", label: "Công việc", icon: AppstoreOutlined, keys: ["/checklist", "/personal-checklist", "/tasks", "/archive"] },
-  { id: "management", label: "Quản lý", icon: SettingOutlined, keys: ["/reports", "/kpi", "/settings"] },
+  { id: "management", label: "Quản lý", icon: SettingOutlined, keys: ["/reports", "/kpi", "/employees", "/departments"] },
 ];
 
 type SidebarPreferences = { collapsed: boolean; closedGroups: string[] };
@@ -49,11 +51,7 @@ export function AppSidebar() {
       void api.get<{ name: string }>(`/users/${user.id}`).then((profile) => setUserName(profile.name)).catch(() => undefined);
     }
   }, []);
-  const visibleItems = menuItems.filter((item) => {
-    if (role === "admin") return true;
-    if (role === "manager") return ["/checklist", "/personal-checklist", "/tasks", "/archive", "/reports", "/kpi"].includes(item.key);
-    return ["/checklist", "/personal-checklist", "/archive"].includes(item.key);
-  });
+  const visibleItems = menuItems.filter((item) => canAccessRoute(role, item.key));
 
   const savePreferences = (next: SidebarPreferences) => {
     setPreferences(next);

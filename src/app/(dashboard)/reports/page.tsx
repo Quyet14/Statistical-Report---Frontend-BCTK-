@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { useTasks } from "@/context/TaskContext";
 import type { TaskItem } from "@/types";
+import { SummaryCard } from "@/components/common/SummaryCard";
+import { CheckCircleOutlined, PieChartOutlined, ClockCircleOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
 
 const getLocalDate = () => {
   const now = new Date();
@@ -211,24 +213,13 @@ export default function ReportsPage() {
       </div>
 
       <div className="stats-grid four-cols">
-        <div className="stat-card green">
-          <span className="stat-label">Task hoàn thành</span>
-          <div className="stat-value">{displaySummary.completedTasks}</div>
-        </div>
-        <div className="stat-card blue">
-          <span className="stat-label">Tỷ lệ hoàn thành</span>
-          <div className="stat-value">{displayCompletionRate}%</div>
-        </div>
-        <div className="stat-card amber">
-          <span className="stat-label">Chậm tiến độ</span>
-          <div className="stat-value">{displaySummary.lateTasks}</div>
-        </div>
-        <div className="stat-card violet">
-          <span className="stat-label">Đúng tiến độ</span>
-          <div className="stat-value">{onTimeRate}%</div>
-        </div>
+        <SummaryCard label="Đã hoàn thành" value={displaySummary.completedTasks} tone="green" icon={<CheckCircleOutlined />} />
+        <SummaryCard label="Tỷ lệ hoàn thành" value={`${displayCompletionRate}%`} tone="blue" icon={<PieChartOutlined />} />
+        <SummaryCard label="Chậm tiến độ" value={displaySummary.lateTasks} tone="amber" icon={<ClockCircleOutlined />} />
+        <SummaryCard label="Đúng tiến độ" value={`${onTimeRate}%`} tone="violet" icon={<SafetyCertificateOutlined />} />
       </div>
 
+      <div className="report-workspace">
       <div className="panel-card chart-panel">
         <div className="chart-header">
           <div>
@@ -261,7 +252,7 @@ export default function ReportsPage() {
               <div key={item.name} className="category-row">
                 <div className="category-meta">
                   <span>{item.name}</span>
-                  <strong>{item.count} task{item.late ? ` · ${item.late} trễ` : ""}</strong>
+                  <strong>{item.count} công việc{item.late ? ` · ${item.late} trễ` : ""}</strong>
                 </div>
                 <div className="mini-progress">
                   <span className={item.tone} style={{ width: `${item.progress}%` }} />
@@ -301,10 +292,11 @@ export default function ReportsPage() {
                   {task.delta}
                 </span>
               </div>
-              )) : <div className="task-status">Không có task trễ hạn trong kỳ này</div>}
+              )) : <div className="task-status">Không có công việc trễ hạn trong kỳ này</div>}
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

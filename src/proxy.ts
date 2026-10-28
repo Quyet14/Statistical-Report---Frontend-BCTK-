@@ -15,6 +15,9 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/kpi") ||
     pathname.startsWith("/reports") ||
     pathname.startsWith("/settings") ||
+    pathname.startsWith("/employees") ||
+    pathname.startsWith("/departments") ||
+    pathname.startsWith("/personal-checklist") ||
     pathname.startsWith("/tasks");
 
   if (isProtectedRoute && !token) {

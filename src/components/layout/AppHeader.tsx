@@ -68,6 +68,7 @@ export function AppHeader() {
     }
   }, []);
   const [isOpen, setIsOpen] = useState(false);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -162,17 +163,20 @@ export function AppHeader() {
     }));
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!form.title.trim()) {
+    if (isCreatingTask || !form.title.trim()) {
       return;
     }
 
-    addTask({
+    setIsCreatingTask(true);
+    const saved = await addTask({
       ...form,
       checklistTitles: form.checklistText.split("\n").map((item) => item.trim()).filter(Boolean),
     });
+    setIsCreatingTask(false);
+    if (!saved) return;
     setForm(defaultForm);
     setIsOpen(false);
   };
@@ -293,7 +297,7 @@ export function AppHeader() {
         <section className="workspace-hero" aria-labelledby="workspace-welcome">
           <div className="workspace-hero-copy">
             <span className="hero-kicker"><span /> KHÔNG GIAN LÀM VIỆC · HUUNGHI CAREOPS</span>
-            <h2 id="workspace-welcome">Một ngày hiệu quả.<br /><em>Cùng nhau tạo khác biệt.</em></h2>
+            <h2 id="workspace-welcome"><span>Một ngày hiệu quả.</span><em>Cùng nhau tạo khác biệt.</em></h2>
             <p>Sắp xếp công việc rõ ràng, kết nối đội ngũ và dành trọn tâm huyết cho những điều quan trọng.</p>
           </div>
           <div className="masthead-art"><WorkspaceSculpture /></div>
@@ -400,8 +404,8 @@ export function AppHeader() {
                 <button type="button" className="secondary-action" onClick={() => setIsOpen(false)}>
                   Hủy
                 </button>
-                <button type="submit" className="primary-action">
-                  Giao việc
+                <button type="submit" className="primary-action" disabled={isCreatingTask}>
+                  {isCreatingTask ? "Đang lưu..." : "Giao việc"}
                 </button>
               </div>
             </form>
