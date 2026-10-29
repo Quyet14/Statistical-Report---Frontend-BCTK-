@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { ApartmentOutlined, TeamOutlined, UserAddOutlined, SearchOutlined, PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { api } from "@/lib/api";
@@ -41,7 +43,7 @@ export function DepartmentManagement() {
     event.preventDefault();
     if (busy || !editing || !form.name.trim()) return;
     setBusy(true);
-    const payload = { name: form.name.trim(), branchId: form.branchId ? Number(form.branchId) : undefined };
+    const payload = { name: form.name.trim(), branchId: form.branchId ? Number(form.branchId) : null };
     const result = await runAction(() => editing === "new" ? api.post("/departments", payload) : api.patch(`/departments/${editing.id}`, payload), { title: editing === "new" ? "Đã tạo khoa/phòng" : "Đã cập nhật khoa/phòng", description: payload.name });
     setBusy(false);
     if (result.ok) { setEditing(null); await load(); }
@@ -63,7 +65,7 @@ export function DepartmentManagement() {
         {loading ? <tr><td colSpan={5} className="empty-table-state">Đang tải danh sách...</td></tr> : visible.length ? visible.map((department) => {
           const members = staff.filter((person) => person.departmentId != null && Number(person.departmentId) === Number(department.id));
           const heads = members.filter((person) => person.role === "manager");
-          return <tr key={department.id}><td><span className="staff-cell"><span className="staff-avatar" aria-hidden="true"><ApartmentOutlined /></span><strong>{department.name}</strong></span></td><td><span className="management-count">{members.length} nhân sự</span></td><td>{heads.length ? heads.map((head) => head.name).join(", ") : <span className="management-muted">Chưa phân công</span>}</td><td>{department.branchId ?? "—"}</td><td><div className="table-actions"><button type="button" className="mini-action edit" disabled={busy} onClick={() => openEdit(department)}><EditOutlined aria-hidden="true" /> Sửa</button><button type="button" className="mini-action delete" disabled={busy} onClick={() => setDeleting(department)}><DeleteOutlined aria-hidden="true" /> Xóa</button></div></td></tr>;
+          return <tr key={department.id}><td><Link className="staff-cell record-link" href={`/departments/${department.id}`}><span className="staff-avatar" aria-hidden="true"><ApartmentOutlined /></span><strong>{department.name}</strong></Link></td><td><Link className="management-count record-link" href={`/departments/${department.id}`}>{members.length} nhân sự</Link></td><td>{heads.length ? heads.map((head, index) => <span key={head.id}>{index > 0 ? ", " : ""}<Link className="record-link" href={`/employees/${head.id}`}>{head.name}</Link></span>) : <span className="management-muted">Chưa phân công</span>}</td><td>{department.branchId ?? "—"}</td><td><div className="table-actions"><Link className="mini-action" href={`/departments/${department.id}`}>Chi tiết</Link><button type="button" className="mini-action edit" disabled={busy} onClick={() => openEdit(department)}><EditOutlined aria-hidden="true" /> Sửa</button><button type="button" className="mini-action delete" disabled={busy} onClick={() => setDeleting(department)}><DeleteOutlined aria-hidden="true" /> Xóa</button></div></td></tr>;
         }) : <tr><td colSpan={5} className="empty-table-state">{query ? "Không tìm thấy khoa/phòng phù hợp." : "Chưa có khoa/phòng. Thêm khoa/phòng để bắt đầu phân bổ nhân sự."}</td></tr>}
       </tbody></table></div>
     </section>

@@ -41,6 +41,13 @@ test('permission failures show a helpful message rather than success', async () 
   assert.match(messages[0].description, /không có quyền/);
 });
 
+test('duplicate account information produces actionable feedback', async () => {
+  const messages = [];
+  await runWithFeedback(async () => { throw new Error('Request failed: 409'); }, (message) => messages.push(message), { title: 'Saved' });
+  assert.equal(messages[0].kind, 'error');
+  assert.match(messages[0].description, /email/);
+});
+
 test('completion dialog appears only for a transition into done', () => {
   assert.equal(taskOutcomeFeedback('doing', 'done', 'Task A').presentation, 'completion');
   assert.equal(taskOutcomeFeedback('todo', 'done', 'Task B').presentation, 'completion');

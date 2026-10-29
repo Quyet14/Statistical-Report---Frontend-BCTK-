@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { clearTokens, getStoredUser } from "@/lib/auth";
+import { useFeedback } from "@/context/FeedbackContext";
 import { api } from "@/lib/api";
 import { useTasks } from "@/context/TaskContext";
 import { BellOutlined, SearchOutlined, PlusOutlined } from "@ant-design/icons";
@@ -47,6 +48,7 @@ const addDays = (date: Date, days: number) => {
 };
 
 export function AppHeader() {
+  const { notify } = useFeedback();
   const router = useRouter();
   const headerRef = useRef<HTMLElement>(null);
   const [isCompact, setIsCompact] = useState(false);
@@ -181,9 +183,9 @@ export function AppHeader() {
     setIsOpen(false);
   };
 
-  const handleLogout = () => {
-    clearTokens();
-    router.replace("/login");
+  const handleLogout = async () => {
+    try { await clearTokens(); window.location.replace("/login"); }
+    catch { notify({ kind: "error", title: "Chưa thể đăng xuất", description: "Vui lòng kiểm tra kết nối và thử lại." }); }
   };
 
   return (
@@ -283,6 +285,9 @@ export function AppHeader() {
 
             {isUserMenuOpen ? (
               <div className="user-menu-panel" role="menu">
+                <button type="button" role="menuitem" onClick={() => { setIsUserMenuOpen(false); router.push("/account"); }}>
+                  Hồ sơ tài khoản
+                </button>
                 <button type="button" role="menuitem" onClick={handleLogout}>
                   Đăng xuất
                 </button>

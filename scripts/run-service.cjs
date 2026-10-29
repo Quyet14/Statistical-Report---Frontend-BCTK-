@@ -1,0 +1,17 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawn } = require('node:child_process');
+const dotenv = require('dotenv');
+const root = path.resolve(__dirname, '..');
+const service = process.argv[2];
+if (!['frontend', 'backend'].includes(service)) throw new Error('Usage: node scripts/run-service.cjs frontend|backend [config-directory]');
+const directory = path.resolve(process.argv[3] || path.join(root, 'deploy/.runtime'));
+const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'manifest.json')));
+const env = dotenv.parse(fs.readFileSync(path.join(directory, `${service}.env`)));
+const cwd = service === 'frontend' ? root : manifest.backendDir;
+const backendBuild = env.CAREOPS_RELEASE === 'device' ? 'dist-device-release/main.js' : 'dist/main.js';
+const command = service === 'frontend' ? [path.join(root, 'node_modules/next/dist/bin/next'), 'start', '--hostname', '127.0.0.1', '--port', env.PORT || '3000'] : [path.join(cwd, backendBuild)];
+const child = spawn(process.execPath, command, { cwd, env: { ...process.env, ...env }, stdio: 'inherit', windowsHide: true });
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));
+child.on('exit', code => { process.exitCode = code ?? 1; });
+child.on('error', () => { console.error('Không khởi động được dịch vụ'); process.exitCode = 1; });

@@ -1,5 +1,9 @@
 require('dotenv').config({ path: '.env.local' });
 require('dotenv').config();
+// This obsolete API is opt-in local development only. Production uses NestJS.
+if (process.env.NODE_ENV !== 'development' || process.env.ALLOW_LEGACY_BACKEND !== 'true') {
+  throw new Error('Legacy backend disabled. Run NestJS on 3010; local legacy use requires NODE_ENV=development and ALLOW_LEGACY_BACKEND=true.');
+}
 const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
@@ -8,7 +12,8 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 
 const app = express();
-const port = process.env.PORT || 3010;
+const port = Number(process.env.LEGACY_BACKEND_PORT || 3099);
+if (!Number.isInteger(port) || port < 1024 || port > 65535 || port === 3010) throw new Error('Use a separate local legacy port (default 3099), never NestJS port 3010.');
 const jwtSecret = process.env.JWT_SECRET || 'bctk-local-development-secret';
 const pendingOtps = new Map();
 
@@ -428,16 +433,30 @@ app.patch('/api/tasks/:taskId/checklist/:itemId', requireAuth, async (req, res) 
   }
 });
 
-app.get('/api/users', async (req, res) => {
+app.get('/api/users', requireAuth, async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, name, email, role, departmentId, isActive FROM users ORDER BY name');
+    const scope = req.user.role === 'admin' ? '' : req.user.role === 'manager' && req.user.departmentId != null ? ' WHERE departmentId = ?' : ' WHERE id = ?';
+    const values = !scope ? [] : [req.user.role === 'manager' && req.user.departmentId != null ? req.user.departmentId : req.user.id];
+    const [rows] = await pool.query(`SELECT id, name, email, role, departmentId, isActive FROM users${scope} ORDER BY name`, values);
     res.json(rows);
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch users', error: String(error) });
   }
 });
 
-app.get('/api/users/:id', async (req, res) => {
+app.get('/api/users/managed', requireAuth, async (req, res) => {
+  if (!['admin', 'manager'].includes(req.user.role)) return res.status(403).json({ message: 'Forbidden' });
+  if (req.user.role === 'manager' && req.user.departmentId == null) return res.json([]);
+  try {
+    const scope = req.user.role === 'admin' ? '' : " WHERE departmentId = ? AND role = 'staff'";
+    const [rows] = await pool.query(`SELECT id, name, email, role, departmentId, isActive FROM users${scope} ORDER BY name`, scope ? [req.user.departmentId] : []);
+    res.json(rows);
+  } catch {
+    res.status(500).json({ message: 'Failed to fetch managed users' });
+  }
+});
+
+app.get('/api/users/:id', requireAuth, async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT u.id, u.name, u.email, u.role, u.departmentId, d.name AS departmentName, u.isActive
@@ -446,6 +465,8 @@ app.get('/api/users/:id', async (req, res) => {
       WHERE u.id = ?
     `, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ message: 'User not found' });
+    const user = rows[0];
+    if (req.user.role !== 'admin' && Number(user.id) !== Number(req.user.id) && !(req.user.role === 'manager' && req.user.departmentId != null && user.departmentId != null && Number(user.departmentId) === Number(req.user.departmentId))) return res.status(403).json({ message: 'Forbidden' });
     res.json(rows[0]);
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch user', error: String(error) });
@@ -466,23 +487,34 @@ app.post('/api/users', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-app.patch('/api/users/:id', requireAuth, requireAdmin, async (req, res) => {
+app.patch('/api/users/:id', requireAuth, async (req, res) => {
+  if (!['admin', 'manager'].includes(req.user.role)) return res.status(403).json({ message: 'Forbidden' });
+  const managed = req.user.role === 'manager';
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return res.status(400).json({ message: 'Invalid update' });
+  if (managed) {
+    if (req.user.departmentId == null || Number(req.params.id) === Number(req.user.id) || Object.keys(body).some((key) => !['name', 'email', 'isActive'].includes(key))) return res.status(403).json({ message: 'Forbidden' });
+    if ((body.name !== undefined && (typeof body.name !== 'string' || !body.name.trim())) || (body.email !== undefined && (typeof body.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email.trim()))) || (body.isActive !== undefined && typeof body.isActive !== 'boolean')) return res.status(400).json({ message: 'Invalid user fields' });
+  }
   try {
     const fields = [];
     const values = [];
     for (const field of ['name', 'email', 'role', 'departmentId', 'isActive', 'password']) {
       if (req.body[field] !== undefined) {
         fields.push(`${field} = ?`);
-        values.push(field === 'password' ? await bcrypt.hash(String(req.body[field]), 12) : req.body[field]);
+        values.push(field === 'password' ? await bcrypt.hash(String(body[field]), 12) : field === 'email' ? body[field].trim().toLowerCase() : field === 'name' ? body[field].trim() : body[field]);
       }
     }
     if (!fields.length) return res.status(400).json({ message: 'No user fields to update' });
     values.push(req.params.id);
-    const [result] = await pool.query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
-    if (!result.affectedRows) return res.status(404).json({ message: 'User not found' });
-    const [rows] = await pool.query('SELECT id, name, email, role, departmentId, isActive FROM users WHERE id = ?', [req.params.id]);
+    const scope = managed ? " AND departmentId = ? AND role = 'staff'" : '';
+    if (managed) values.push(req.user.departmentId);
+    const [result] = await pool.query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?${scope}`, values);
+    if (!result.affectedRows) return res.status(managed ? 403 : 404).json({ message: managed ? 'Forbidden' : 'User not found' });
+    const [rows] = await pool.query(`SELECT id, name, email, role, departmentId, isActive FROM users WHERE id = ?${scope}`, managed ? [req.params.id, req.user.departmentId] : [req.params.id]);
     res.json(rows[0]);
   } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'Email already exists' });
     res.status(500).json({ message: 'Failed to update user', error: String(error) });
   }
 });
@@ -497,7 +529,7 @@ app.delete('/api/users/:id', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-app.get('/api/departments', async (req, res) => {
+app.get('/api/departments', requireAuth, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT id, name, branchId FROM departments ORDER BY name');
     res.json(rows);
@@ -506,7 +538,7 @@ app.get('/api/departments', async (req, res) => {
   }
 });
 
-app.post('/api/departments', async (req, res) => {
+app.post('/api/departments', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { name, branchId } = req.body;
     const [result] = await pool.query('INSERT INTO departments (name, branchId) VALUES (?, ?)', [name, branchId || null]);
@@ -516,7 +548,7 @@ app.post('/api/departments', async (req, res) => {
   }
 });
 
-app.patch('/api/departments/:id', async (req, res) => {
+app.patch('/api/departments/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const [result] = await pool.query('UPDATE departments SET name = ?, branchId = ? WHERE id = ?', [req.body.name, req.body.branchId || null, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ message: 'Department not found' });
@@ -526,7 +558,7 @@ app.patch('/api/departments/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/departments/:id', async (req, res) => {
+app.delete('/api/departments/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const [result] = await pool.query('DELETE FROM departments WHERE id = ?', [req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ message: 'Department not found' });
@@ -597,7 +629,7 @@ app.get('/api/reports', requireAuth, async (req, res) => {
 Promise.all([migratePlaintextPasswords(), ensureChecklistTable(), ensureNotificationsTable()])
   .then(async () => {
     await createTaskReminders();
-    app.listen(port, () => {
+    app.listen(port, '127.0.0.1', () => {
       console.log(`Backend running on http://localhost:${port}`);
     });
     setInterval(() => {

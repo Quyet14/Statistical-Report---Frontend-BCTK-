@@ -1,0 +1,33 @@
+# REVIEW TEMPLATE; not installed by this change. Replace domains/certificates/secret.
+# Restrict Next :3000 to this gateway and Nest :3010 to the Next servers.
+server {
+    listen 80;
+    server_name careops.example.com;
+    return 308 https://careops.example.com$request_uri;
+}
+server {
+    listen 443 ssl;
+    server_name careops.example.com;
+    ssl_certificate /etc/letsencrypt/live/careops.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/careops.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    # HSTS is also emitted by Next. Do not add a conflicting CSP here.
+    client_max_body_size 64k;
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host careops.example.com;
+        proxy_set_header X-Forwarded-Proto https;
+        # Always replace caller-supplied assertions. Never $proxy_add_x_forwarded_for.
+        proxy_set_header X-CareOps-Client-IP $remote_addr;
+        proxy_set_header X-CareOps-Edge-Key "REPLACE_WITH_TRUSTED_EDGE_SECRET";
+        proxy_set_header X-Forwarded-For "";
+        proxy_set_header Forwarded "";
+        proxy_set_header X-Real-IP "";
+        proxy_set_header X-CareOps-Forwarded-At "";
+        proxy_set_header X-CareOps-Forwarded-Signature "";
+    }
+}
+# If a separate load balancer precedes nginx, configure real_ip_header and
+# set_real_ip_from ONLY for its exact source IPs/CIDRs after validating the chain.
+# Never trust all addresses or an unverified client-supplied IP header.

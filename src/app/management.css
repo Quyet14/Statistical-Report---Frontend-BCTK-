@@ -1,3 +1,39 @@
+.record-link { color: #3862a8; text-decoration: none; border-radius: 4px; }
+.record-link:hover { color: #165caa; text-decoration: underline; text-underline-offset: 3px; }
+.record-link:focus-visible, .detail-back:focus-visible { outline: 2px solid #628ddd; outline-offset: 4px; }
+.detail-page { display: grid; gap: 16px; }
+.detail-back { display: inline-flex; align-items: center; gap: 8px; width: fit-content; margin-bottom: 12px; color: #56739a; font-size: 14px; }
+.detail-page .detail-back { margin-bottom: 0; }
+.detail-hero { display: flex; align-items: center; gap: 20px; padding: 26px; border: 1px solid #dce8f5; border-radius: 20px; background: radial-gradient(ellipse at right top, #cdeee66b, transparent 55%), linear-gradient(115deg, #fff, #f0f3ff); box-shadow: inset 0 1px #fff, 0 9px 22px -18px #305a96; }
+.detail-hero h1 { margin: 5px 0 8px; font-size: clamp(24px, 2.5vw, 32px); color: #2e5085; line-height: 1.35; overflow-wrap: anywhere; }
+.detail-hero p { margin: 0; color: #637b9c; font-size: 14px; line-height: 1.7; }
+.detail-hero .detail-eyebrow { color: #5e77ad; font-size: 11px; font-weight: 750; letter-spacing: .12em; }
+.detail-hero-icon, .detail-profile-avatar { display: grid; place-items: center; flex: 0 0 76px; height: 76px; border-radius: 23px; border: 1px solid #fff; background: linear-gradient(135deg, #e2eaff, #faffff); box-shadow: inset 0 2px #fff, 0 5px 0 #c9d5e7, 0 12px 20px #31528612; color: #5880c2; font-size: 32px; }
+.detail-profile-avatar { background: linear-gradient(135deg, #daf1e9, #eef7ff); color: #248c79; font-size: 25px; font-weight: 750; }
+.detail-record-id, .account-hero > .table-status { margin-left: auto; flex-shrink: 0; }
+.detail-record-id { padding: 8px 12px; border: 1px solid #dce6f4; border-radius: 10px; color: #6580a2; background: #ffffffa8; font-size: 12px; }
+.detail-page .stats-grid { margin-bottom: 0; }
+.detail-information h2, .account-overview h2 { margin: 0 0 18px; color: #365784; font-size: 18px; font-weight: 700; }
+.detail-information, .account-overview { padding: 22px; }
+.detail-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 24px; margin: 0; }
+.detail-fields > div { min-width: 0; }
+.detail-fields dt { color: #7a8da6; font-size: 12px; margin-bottom: 7px; }
+.detail-fields dd { margin: 0; color: #405d83; font-size: 15px; font-weight: 550; overflow-wrap: anywhere; line-height: 1.65; }
+.detail-members-table th:last-child { width: 125px; }
+.detail-open-link { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; }
+.detail-state { padding: 60px 24px; text-align: center; color: #68809e; margin-top: 8px; }
+.detail-state h2 { font-size: 21px; color: #3f6089; }
+.detail-state p { margin: 12px 0 20px; }
+.account-detail-grid { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(260px, 1fr); gap: 16px; align-items: start; }
+.account-detail-grid .detail-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.account-overview-item { display: flex; gap: 12px; padding: 17px 0; border-bottom: 1px solid #edf1f7; color: #608cbb; }
+.account-overview-item > .anticon { margin-top: 4px; font-size: 20px; }
+.account-overview-item > div { min-width: 0; }
+.account-overview-item span:not(.anticon) { display: block; color: #8192ab; font-size: 12px; margin-bottom: 5px; }
+.account-overview-item strong, .account-overview-item a { font-size: 14px; color: #48678c; overflow-wrap: anywhere; }
+.detail-department-action { display: block; padding: 13px; margin-top: 18px; border-radius: 10px; background: #edf7f4; color: #328773; font-size: 13px; font-weight: 650; text-align: center; }
+@media (max-width: 900px) { .account-detail-grid { grid-template-columns: 1fr; } .detail-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .detail-hero { padding: 20px; gap: 14px; flex-wrap: wrap; } .detail-hero > div { flex: 1; min-width: 180px; } .detail-hero-icon, .detail-profile-avatar { flex-basis: 58px; height: 58px; border-radius: 18px; font-size: 24px; } .detail-record-id, .account-hero > .table-status { margin-left: 0; } .detail-fields, .account-detail-grid .detail-fields { grid-template-columns: 1fr; gap: 18px; } }
 .management-directory { padding: 18px; }
 .management-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; }
 .management-toolbar h2 { margin: 0 0 4px; color: #3a537d; font-size: 17px; font-weight: 750; }

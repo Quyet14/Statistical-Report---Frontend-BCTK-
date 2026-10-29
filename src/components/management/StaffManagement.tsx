@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { TeamOutlined, UserSwitchOutlined, StopOutlined, SearchOutlined, PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { api } from "@/lib/api";
@@ -55,7 +57,7 @@ export function StaffManagement() {
   };
   const save = async (event: FormEvent) => {
     event.preventDefault();
-    if (busy || !editing) return;
+    if (busy || !editing || !form.name.trim()) return;
     setBusy(true);
     const payload = isAdmin
       ? { name: form.name.trim(), email: form.email.trim().toLowerCase(), role: form.role, departmentId: form.departmentId ? Number(form.departmentId) : null, ...(form.password ? { password: form.password } : {}) }
@@ -85,7 +87,7 @@ export function StaffManagement() {
 
   return <div className="dashboard-page management-page" data-page="settings">
     <div className="page-header"><div><h1 className="page-title">Quản lý nhân viên</h1><p className="page-description">{isAdmin ? "Quản lý tài khoản, phân quyền và phân công khoa/phòng trong toàn bệnh viện." : "Cập nhật thông tin và trạng thái tài khoản nhân viên thuộc khoa/phòng của bạn."}</p></div>
-      {isAdmin ? <button type="button" className="primary-action" onClick={() => openEdit("new")}><PlusOutlined aria-hidden="true" /> Thêm nhân viên</button> : <span className="status-badge success">{scope}</span>}
+      {isAdmin ? <button type="button" className="primary-action" onClick={() => openEdit("new")}><PlusOutlined aria-hidden="true" /> Thêm nhân viên</button> : currentUser?.departmentId != null ? <Link className="status-badge success record-link" href={`/departments/${currentUser.departmentId}`}>{scope} →</Link> : <span className="status-badge success">{scope}</span>}
     </div>
     <div className="stats-grid"><SummaryCard label="Tổng nhân viên" value={staff.length} tone="blue" icon={<TeamOutlined />} /><SummaryCard label="Đang hoạt động" value={staff.filter((person) => person.isActive).length} tone="green" icon={<UserSwitchOutlined />} /><SummaryCard label="Đã vô hiệu hóa" value={staff.filter((person) => !person.isActive).length} tone="amber" icon={<StopOutlined />} /></div>
     <section className="panel-card management-directory" aria-label="Danh sách nhân viên">
@@ -98,8 +100,8 @@ export function StaffManagement() {
       {!isAdmin && currentUser?.departmentId == null ? <p className="management-scope-note">Tài khoản chưa được gán khoa/phòng. Vui lòng liên hệ admin để cập nhật.</p> : null}
       <div className="table-scroll"><table className="modern-table management-table"><thead><tr><th>Nhân viên</th><th>Khoa/phòng</th><th>Vai trò</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
         {loading ? <tr><td colSpan={5} className="empty-table-state">Đang tải danh sách...</td></tr> : visible.length ? visible.map((person) => <tr key={person.id}>
-          <td><div className="staff-cell"><span className="staff-avatar" aria-hidden="true">{person.name.trim().split(/\s+/).slice(-1)[0]?.[0]?.toUpperCase()}</span><div><strong>{person.name}</strong><span className="management-email">{person.email}</span></div></div></td>
-          <td>{departmentNames.get(Number(person.departmentId)) ?? "Chưa phân khoa"}</td><td><span className={`management-role role-${person.role}`}>{roleNames[person.role] ?? person.role}</span></td>
+          <td><Link className="staff-cell record-link" href={`/employees/${person.id}`}><span className="staff-avatar" aria-hidden="true">{person.name.trim().split(/\s+/).slice(-1)[0]?.[0]?.toUpperCase()}</span><div><strong>{person.name}</strong><span className="management-email">{person.email}</span></div></Link></td>
+          <td>{person.departmentId != null ? <Link className="record-link" href={`/departments/${person.departmentId}`}>{departmentNames.get(Number(person.departmentId)) ?? `Khoa/phòng #${person.departmentId}`}</Link> : "Chưa phân khoa"}</td><td><span className={`management-role role-${person.role}`}>{roleNames[person.role] ?? person.role}</span></td>
           <td><span className={`table-status ${person.isActive ? "status-done" : "status-inactive"}`}>{person.isActive ? "Hoạt động" : "Vô hiệu hóa"}</span></td>
           <td><div className="table-actions"><button type="button" className="mini-action edit" disabled={busy} onClick={() => openEdit(person)}><EditOutlined aria-hidden="true" /> Sửa</button><button type="button" className="mini-action" disabled={busy} onClick={() => void toggleStatus(person)}>{person.isActive ? "Vô hiệu hóa" : "Kích hoạt"}</button>{isAdmin ? <button type="button" className="mini-action delete" disabled={busy} onClick={() => setDeleting(person)} aria-label={`Xóa tài khoản ${person.name}`}><DeleteOutlined aria-hidden="true" /></button> : null}</div></td>
         </tr>) : <tr><td colSpan={5} className="empty-table-state">{query || status !== "all" || departmentFilter !== "all" ? "Không tìm thấy nhân viên phù hợp với bộ lọc." : "Chưa có nhân viên trong phạm vi quản lý."}</td></tr>}

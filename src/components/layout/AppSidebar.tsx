@@ -85,7 +85,7 @@ export function AppSidebar() {
           const items = visibleItems.filter((item) => group.keys.includes(item.key));
           if (!items.length) return null;
           const isOpen = !preferences.closedGroups.includes(group.id);
-          const hasActive = items.some((item) => pathname === item.key);
+          const hasActive = items.some((item) => pathname === item.key || pathname.startsWith(`${item.key}/`));
           return (
             <div className={`sidebar-group${hasActive ? " has-active" : ""}`} key={group.id}>
               <button type="button" className="sidebar-group-title" aria-expanded={isOpen}
@@ -101,7 +101,7 @@ export function AppSidebar() {
               </button>
               <div className="sidebar-group-links" id={`sidebar-group-${group.id}`} hidden={!isOpen}>
         {items.map((item) => {
-          const isActive = pathname === item.key;
+          const isActive = pathname === item.key || pathname.startsWith(`${item.key}/`);
 
           return (
             <Link
@@ -130,14 +130,14 @@ export function AppSidebar() {
 
       </div>
 
-      <div className="sidebar-usercard" title={`${userName} · ${userRole}`}>
+      <Link href="/account" className="sidebar-usercard" title={`Xem hồ sơ: ${userName} · ${userRole}`} aria-label={`Xem hồ sơ tài khoản ${userName}`}>
         <div className="user-avatar">{userName.trim().split(/\s+/).slice(-2).map((part) => part[0]).join("").toUpperCase()}</div>
         <div className="sidebar-user-info">
           <div className="user-name">{userName}</div>
           <div className="user-role">{userRole}</div>
         </div>
         <span className="user-icon">◎</span>
-      </div>
+      </Link>
     </aside>
   );
 }

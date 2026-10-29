@@ -11,9 +11,14 @@ export function taskOutcomeFeedback(previousStatus: string | undefined, nextStat
 }
 
 export function actionErrorMessage(error: unknown) {
+  if (error instanceof Error && "status" in error && typeof error.status === "number") {
+    if (error.status === 409) return "Thông tin đã tồn tại. Vui lòng kiểm tra email hoặc dữ liệu bị trùng.";
+    return error.message;
+  }
   const message = error instanceof Error ? error.message : "";
   if (/\b403\b/.test(message)) return "Bạn không có quyền thực hiện thao tác này.";
   if (/\b401\b/.test(message)) return "Phiên đăng nhập đã hết hạn. Vui lòng tải lại trang.";
+  if (/\b409\b/.test(message)) return "Thông tin đã tồn tại. Vui lòng kiểm tra email hoặc dữ liệu bị trùng.";
   return "Chưa lưu được thay đổi. Kiểm tra kết nối và thử lại nhé.";
 }
 

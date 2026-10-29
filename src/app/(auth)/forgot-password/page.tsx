@@ -2,8 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { PasswordField } from "@/components/common/PasswordField";
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { forgotPassword, resetPassword } from "@/lib/auth";
+import { useAuthCooldown } from "@/components/auth/useAuthCooldown";
+import { clearClientSession } from "@/lib/session";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -15,6 +17,8 @@ export default function ForgotPasswordPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [step, setStep] = useState<"request" | "reset">("request");
+  const inFlight = useRef(false);
+  const cooldown = useAuthCooldown();
 
   const clearFeedback = () => {
     setError("");
@@ -23,22 +27,28 @@ export default function ForgotPasswordPage() {
 
   const handleRequestOtp = async (event: FormEvent) => {
     event.preventDefault();
+    if (inFlight.current || cooldown.seconds > 0) return;
+    inFlight.current = true;
     clearFeedback();
     setIsLoading(true);
 
     try {
-      const result = await forgotPassword(email);
-      setMessage(result.message || `Mã OTP đã được gửi tới ${email}.`);
+      await forgotPassword(email);
+      setEmail(email.trim().toLowerCase());
+      setMessage("Nếu tài khoản đủ điều kiện, mã xác minh sẽ được gửi đến email bạn đã nhập.");
       setStep("reset");
     } catch (err) {
+      cooldown.capture(err);
       setError(err instanceof Error ? err.message : "Gửi mã OTP thất bại");
     } finally {
+      inFlight.current = false;
       setIsLoading(false);
     }
   };
 
   const handleResetPassword = async (event: FormEvent) => {
     event.preventDefault();
+    if (inFlight.current || cooldown.seconds > 0) return;
     clearFeedback();
 
     if (newPassword !== confirmedPassword) {
@@ -46,15 +56,20 @@ export default function ForgotPasswordPage() {
       return;
     }
 
+    inFlight.current = true;
     setIsLoading(true);
 
     try {
-      const result = await resetPassword(email, otp, newPassword);
-      setMessage(result.message || "Mật khẩu đã được cập nhật. Bạn có thể đăng nhập lại.");
+      await resetPassword(email, otp, newPassword);
+      clearClientSession();
+      setNewPassword(""); setConfirmedPassword(""); setOtp("");
+      setMessage("Mật khẩu đã được cập nhật. Vui lòng đăng nhập lại.");
       setTimeout(() => router.replace("/login"), 900);
     } catch (err) {
+      cooldown.capture(err);
       setError(err instanceof Error ? err.message : "Đổi mật khẩu thất bại");
     } finally {
+      inFlight.current = false;
       setIsLoading(false);
     }
   };
@@ -85,10 +100,11 @@ export default function ForgotPasswordPage() {
             <p className="auth-card-subtitle">
               {step === "request"
                 ? "Nhập email công việc, chúng tôi sẽ gửi mã xác minh cho bạn."
-                : `Mã xác minh đã được gửi tới ${email}.`}
+                : `Nhập mã xác minh nhận qua email ${email}, nếu tài khoản đủ điều kiện.`}
             </p>
           </div>
 
+          {cooldown.seconds > 0 ? <div className="auth-alert" role="status">Vui lòng thử lại sau {cooldown.seconds} giây.</div> : null}
           {message ? <div className="auth-alert auth-alert-success">{message}</div> : null}
           {error ? <div className="auth-alert auth-alert-error">{error}</div> : null}
 
@@ -96,7 +112,7 @@ export default function ForgotPasswordPage() {
             <form onSubmit={handleRequestOtp} className="auth-form">
               <label className="auth-label">
                 Email công việc
-                <PasswordField
+                <input
                   className="auth-input"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
@@ -107,7 +123,7 @@ export default function ForgotPasswordPage() {
                 />
               </label>
 
-              <button type="submit" disabled={isLoading} className="auth-primary">
+              <button type="submit" disabled={isLoading || cooldown.seconds > 0} className="auth-primary">
                 {isLoading ? "Đang gửi mã..." : "Gửi mã xác minh"}
               </button>
               <button type="button" disabled={isLoading} className="auth-secondary" onClick={() => router.replace("/login")}>
@@ -133,7 +149,7 @@ export default function ForgotPasswordPage() {
 
               <label className="auth-label">
                 Mật khẩu mới
-                <input
+                <PasswordField
                   className="auth-input"
                   value={newPassword}
                   onChange={(event) => setNewPassword(event.target.value)}
@@ -157,11 +173,11 @@ export default function ForgotPasswordPage() {
                 />
               </label>
 
-              <button type="submit" disabled={isLoading || otp.length !== 6} className="auth-primary">
+              <button type="submit" disabled={isLoading || cooldown.seconds > 0 || otp.length !== 6} className="auth-primary">
                 {isLoading ? "Đang cập nhật..." : "Đặt lại mật khẩu"}
               </button>
               <div className="auth-link-row">
-                <button type="button" disabled={isLoading} className="auth-text-button" onClick={requestAnotherOtp}>
+                <button type="button" disabled={isLoading || cooldown.seconds > 0} className="auth-text-button" onClick={requestAnotherOtp}>
                   Gửi mã khác
                 </button>
                 <button type="button" disabled={isLoading} className="auth-text-button" onClick={() => router.replace("/login")}>
