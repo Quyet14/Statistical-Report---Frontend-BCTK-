@@ -4,6 +4,7 @@ const { randomBytes } = require('node:crypto');
 const { isIP } = require('node:net');
 const { spawnSync } = require('node:child_process');
 const dotenv = require('dotenv');
+const { withUploadLimits } = require('./nginx-upload-limits.cjs');
 const root = path.resolve(__dirname, '..');
 const read = file => fs.existsSync(file) ? dotenv.parse(fs.readFileSync(file)) : {};
 const secret = () => randomBytes(48).toString('base64url');
@@ -60,6 +61,8 @@ function generate({ origin: originText, backendDir, outDir, lan = false, certFil
   write('redis.compose.yml', `services:\n  redis:\n    image: redis:8-alpine@sha256:47b08295737773de3b711fb86f13ae802f5074e96a9a2d29f5f80164ac08c046\n    restart: unless-stopped\n    ports: ["127.0.0.1:6379:6379"]\n    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]\n    volumes:\n      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro\n      - redis-data:/data\nvolumes:\n  redis-data:\n`);
   const certPath = tlsCert.replaceAll('\\', '/'), keyPath = tlsKey.replaceAll('\\', '/');
   write('nginx.conf', `events {}\nhttp {\n  server {\n    listen ${origin.port || 443} ssl;\n    server_name ${origin.hostname};\n    ssl_certificate "${certPath}";\n    ssl_certificate_key "${keyPath}";\n    ssl_protocols TLSv1.2 TLSv1.3;\n    client_max_body_size 64k;\n    location / {\n      proxy_pass http://127.0.0.1:3000;\n      proxy_http_version 1.1;\n      proxy_set_header Host ${origin.host};\n      proxy_set_header X-Forwarded-Proto https;\n      proxy_set_header X-CareOps-Client-IP $remote_addr;\n      proxy_set_header X-CareOps-Edge-Key "${edge}";\n      proxy_set_header X-Forwarded-For "";\n      proxy_set_header Forwarded "";\n      proxy_set_header X-Real-IP "";\n      proxy_set_header X-CareOps-Forwarded-At "";\n      proxy_set_header X-CareOps-Forwarded-Signature "";\n    }\n  }\n}\n`);
+  const nginxFile = path.join(destination, 'nginx.conf');
+  fs.writeFileSync(nginxFile, withUploadLimits(fs.readFileSync(nginxFile, 'utf8')));
   write('manifest.json', JSON.stringify({ origin: origin.origin, backendDir: path.resolve(backendDir), certificate: lan ? 'self-signed-LAN-test-only' : 'provided-by-operator', createdAt: new Date().toISOString() }, null, 2));
   return { origin: origin.origin, directory: destination, selfSigned: lan };
 }

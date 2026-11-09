@@ -36,3 +36,29 @@ test('API browser transport uses cookies and never reads tokens from storage', a
   const { api } = tsLoader({ window: { localStorage: { getItem() { throw new Error('Token storage must not be read'); } } }, fetch: async (url, options) => { assert.equal(url, '/api/users'); assert.equal(options.credentials, 'same-origin'); assert.equal(options.headers.Authorization, undefined); return Response.json([]); } })('src/lib/api/index.ts');
   assert.equal((await api.get('/users')).length, 0);
 });
+test('multipart upload reports progress and keeps the browser-managed boundary', async () => {
+  const progress = [];
+  class UploadRequest {
+    upload = {};
+    headers = {};
+    status = 201;
+    responseText = '{"id":8}';
+    open(method, url) { this.method = method; this.url = url; }
+    setRequestHeader(name, value) { this.headers[name] = value; }
+    getAllResponseHeaders() { return 'Content-Type: application/json\r\n'; }
+    send(body) {
+      assert.equal(this.method, 'POST');
+      assert.equal(this.url, '/api/tasks/12/attachments');
+      assert.ok(body instanceof FormData);
+      assert.equal(this.headers['Content-Type'], undefined);
+      this.upload.onprogress({ loaded: 25, total: 100, lengthComputable: true });
+      this.onload();
+    }
+  }
+  const { api } = tsLoader({ FormData, XMLHttpRequest: UploadRequest, fetch: () => { throw new Error('Fetch should not be used for progress uploads'); } })('src/lib/api/index.ts');
+  const form = new FormData();
+  form.append('file', new Blob(['image']), 'proof.jpg');
+  const result = await api.postFormWithProgress('/tasks/12/attachments', form, (loaded, total) => progress.push([loaded, total]));
+  assert.equal(result.id, 8);
+  assert.deepEqual(progress, [[25, 100]]);
+});

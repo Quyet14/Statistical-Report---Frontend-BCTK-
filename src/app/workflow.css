@@ -1,0 +1,76 @@
+.workflow-tabs { display: flex; gap: 6px; padding: 6px; border: 1px solid #dce5f3; border-radius: 15px; background: #ecf2fa; margin-bottom: 18px; flex-wrap: wrap; }
+.workflow-tabs button { border: 0; background: transparent; padding: 12px 18px; border-radius: 10px; color: #526b8a; font-weight: 700; cursor: pointer; }
+.workflow-tabs button[aria-selected="true"] { color: #fff; background: linear-gradient(135deg,#2b689c,#4b5cc5); box-shadow: 0 5px 12px #314c9c25; }
+.workflow-list-toolbar { display: flex; align-items: end; gap: 16px; padding: 18px; flex-wrap: wrap; }
+.workflow-list-toolbar label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; color: #506584; }
+.workflow-list-toolbar label:first-child { flex: 1; min-width: 220px; }
+.workflow-list-toolbar .auth-input { min-height: 43px; font-size: 15px; }
+.workflow-table-wrap { overflow-x: auto; }
+.workflow-table-wrap td small { display: block; color: #71849b; margin-top: 5px; }
+.workflow-state { display: inline-flex; padding: 6px 10px; border-radius: 9px; background: #edf2fa; color: #486286; font-weight: 700; font-size: 12px; }
+.workflow-state.submitted { background: #fff1ce; color: #95620a; }
+.workflow-state.approved { background: #dcf5ec; color: #0e7e60; }
+.workflow-state.rejected { background: #fff0ef; color: #b43c4e; }
+.workflow-empty { padding: 40px 22px; text-align: center; color: #71849b; }
+.workflow-alert { padding: 18px; display: flex; justify-content: space-between; gap: 12px; color: #a42c43; background: #fff0f2; border-radius: 12px; margin-bottom: 16px; }
+.workflow-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 16px; margin: 20px 0; color: #667992; font-size: 14px; }
+.workflow-template-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(290px,1fr)); gap: 18px; }
+.workflow-template { padding: 22px; border-top: 3px solid #6d83cb; box-shadow: 0 8px 24px #304e8210; }
+.workflow-template h4 { color: #304f81; font-size: 19px; margin: 20px 0 12px; }
+.workflow-template p { color: #6a7e96; font-size: 14px; line-height: 1.7; }
+.workflow-template-top { display: flex; align-items: center; justify-content: space-between; color: #7c8a9e; }
+.workflow-template-form { max-height: 90vh; overflow-y: auto; }
+.workflow-template-form label { display: grid; gap: 8px; }
+.workflow-template-form p { color: #6b7b8c; font-size: 13px; }
+.workflow-audit { padding: 22px; }
+.workflow-audit article { display: flex; gap: 14px; padding: 12px 0 20px; border-bottom: 1px solid #eaf0f5; }
+.workflow-audit article p { margin: 10px 0; color: #526784; }
+.workflow-audit time { color: #8291a7; font-size: 12px; }
+.workflow-audit details { margin-top: 12px; color: #58728f; font-size: 13px; }
+.workflow-audit pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f4f7fb; padding: 12px; border-radius: 9px; }
+.workflow-audit-dot,.notification-center-dot { width: 11px; height: 11px; border-radius: 50%; background: #6489cc; flex-shrink: 0; margin-top: 8px; box-shadow: 0 0 0 5px #6388cc14; }
+.workflow-inline-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-top: 15px; }
+.workflow-inline-actions label { flex: 1; display: grid; gap: 6px; font-size: 13px; }
+.task-workflow-state { padding: 12px; border-radius: 10px; font-size: 12px; background: #eef3fc; color: #49618b; }
+.task-workflow-state.submitted { background: #fff5df; color: #9b6a13; }
+.task-workflow-state.approved { background: #e3f7ee; color: #16805e; }
+.task-workflow-state.rejected { background: #fff0ef; color: #b64853; }
+.task-workflow-state p { margin: 8px 0; }
+.task-workflow-state button { margin-top: 8px; font-size: 12px; }
+.notification-center-list { display: grid; gap: 14px; }
+.notification-center-item { padding: 24px; display: flex; gap: 18px; border-left: 3px solid #6596ce; }
+.notification-center-item.is-read { border-left-color: #dce6ed; opacity: .82; }
+.notification-center-dot.overdue { background: #d4616b; }
+.notification-center-item p { color: #697f93; line-height: 1.8; }
+.notification-center-item time { font-size: 12px; color: #8a9bad; }
+.report-print-header,.report-signatures { display: none; }
+@media print { .report-print-header { display: flex; align-items: center; gap: 20px; border-bottom: 2px solid #214a7e; padding-bottom: 20px; margin-bottom: 20px; } .report-print-header img { width: 64px; height: 64px; } .report-signatures { display: flex; justify-content: space-around; padding: 40px 0 80px; text-align: center; } .workspace-masthead,.masthead,.session-idle-notice { display: none !important; } }
+/* Keep review forms legible inside narrow Kanban cards. */
+.task-workflow-state .workflow-inline-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+.task-workflow-state .workflow-inline-actions > label {
+  display: flex;
+  flex-direction: column;
+  grid-column: 1 / -1;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+  line-height: 1.5;
+}
+.task-workflow-state .workflow-inline-actions input {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  padding: 10px 12px;
+}
+.task-workflow-state .workflow-inline-actions > button {
+  min-width: 0;
+  padding: 10px 8px;
+  white-space: normal;
+  line-height: 1.4;
+}
+.task-workflow-state > button { width: 100%; }

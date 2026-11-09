@@ -34,7 +34,6 @@ export default function ArchivePage() {
         <div>
           <span className="eyebrow">Tra cứu vận hành</span>
           <h3 className="page-title">Lưu trữ việc đã hoàn thành</h3>
-          <p className="page-description">Lưu giữ kết quả, tra cứu nhanh và kết nối thông tin công việc.</p>
         </div>
       </div>
 

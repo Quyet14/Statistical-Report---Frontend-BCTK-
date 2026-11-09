@@ -6,8 +6,8 @@ Bản ghi nhớ thiết bị được build riêng, không ghi đè bản đang 
 
 Chỉ trong thời gian bảo trì đã được đồng ý: dừng bộ launcher, chạy `node scripts/select-device-release.cjs --activate`, rồi khởi động lại launcher. Lệnh chọn bản chỉ sửa hai env dưới `.runtime`, không đổi secret; lưu bản trước ở `.runtime/device-release-previous.json` (chứa bí mật, không chia sẻ). Nếu cần quay lại cấu hình trước, dùng `--restore` rồi khởi động lại bộ dịch vụ. Không tự chuyển cấu hình hoặc dừng dịch vụ khi chưa cho phép gián đoạn.
 
-- Origin kiểm thử: `https://192.168.81.178:3443` (phải cùng Wi-Fi/LAN).
-- Next và Nest chỉ nghe loopback ở 3000/3010; truy cập từ thiết bị khác qua gateway HTTPS 3443.
+- Origin kiểm thử: `https://192.168.100.4:3443` (phải cùng Wi-Fi/LAN).
+- Bộ LAN hiện dùng Next và Nest trên loopback 3300/3310; thiết bị khác truy cập qua gateway HTTPS 3443. Cổng 3000/3010 dành cho development riêng.
 - `deploy/.runtime` chứa cấu hình riêng, chứng chỉ tự ký, Redis password và secret; thư mục này bị Git bỏ qua. Không gửi thư mục này cho người không được phép, không chụp/log nội dung env.
 - Chứng chỉ tự ký chỉ dùng kiểm thử. Thiết bị khác cần chấp nhận chứng chỉ hoặc được quản trị viên cài chứng chỉ tin cậy phù hợp. Không bỏ xác minh TLS cho production, không tự cài root CA trên máy người dùng.
 - IP Wi-Fi có thể đổi. Nếu đổi IP/origin, tạo bộ cấu hình mới ở thư mục runtime khác; không sửa riêng Origin mà quên chứng chỉ/SAN. Server nội bộ nên có IP/DNS cố định và chứng chỉ CA nội bộ.
@@ -17,7 +17,7 @@ Chỉ trong thời gian bảo trì đã được đồng ý: dừng bộ launche
 Từ thư mục frontend, dùng backend nằm cạnh frontend hoặc truyền `--backend-dir`:
 
 ```powershell
-node scripts/deployment-config.cjs --generate --origin=https://192.168.81.178:3443 --lan
+node scripts/deployment-config.cjs --generate --origin=https://192.168.100.4:3443 --lan
 node scripts/deployment-config.cjs --check --generated
 ```
 
@@ -27,11 +27,11 @@ Trên server thật, thay `--lan` bằng `--cert=... --key=...` với chứng ch
 
 ## Khởi động
 
-Nếu vẫn mở terminal `npm run dev` trong lúc thử bộ HTTPS, có thể đặt `DEV_LOGIN_GATEWAY_ORIGIN=https://192.168.81.178:3443` trong `.env.local`. Trang `/`, `/login`, `/forgot-password` ở development sẽ chuyển tạm thời sang gateway; không chuyển tiếp POST API hoặc bỏ kiểm tra bảo mật. Biến này không áp dụng cho production. Xóa biến khi quay lại chế độ development độc lập; cập nhật khi đổi IP của gateway.
+Nếu vẫn mở terminal `npm run dev` trong lúc thử bộ HTTPS, có thể đặt `DEV_LOGIN_GATEWAY_ORIGIN=https://192.168.100.4:3443` trong `.env.local`. Trang `/`, `/login`, `/forgot-password` ở development sẽ chuyển tạm thời sang gateway; không chuyển tiếp POST API hoặc bỏ kiểm tra bảo mật. Biến này không áp dụng cho production. Xóa biến khi quay lại chế độ development độc lập; cập nhật khi đổi IP của gateway.
 
-Chỉ chạy một bộ dịch vụ: khi đã dùng `scripts/lan-services.ps1 -Action start`, không chạy thêm `npm run dev` ở frontend hoặc `npm run start:dev` ở backend. Backend do launcher quản lý đã chiếm cổng 3010; chạy thêm sẽ báo `EADDRINUSE`. Frontend development chạy đồng thời cũng có thể ghi đè thư mục `.next` của bản đang phục vụ.
+Chỉ chạy một bộ LAN do launcher quản lý. Bản LAN build riêng dùng 3300/3310, development có thể dùng 3000/3010. Không chạy hai tiến trình cùng cổng hoặc build đè thư mục của bản đang phục vụ; lỗi `EADDRINUSE` nghĩa là cổng đã có tiến trình lắng nghe.
 
-Truy cập bằng HTTPS origin trong `deploy/.runtime/manifest.json` (máy thử hiện tại: `https://192.168.81.178:3443`). Truy cập trực tiếp HTTP cổng 3000 hoặc HTTPS bằng hostname khác sẽ không khớp cấu hình Origin/gateway và bị chặn. Khi Wi-Fi đổi IP, cần tạo lại bộ cấu hình cho IP mới. Không tắt kiểm tra Origin hoặc chữ ký để bỏ qua lỗi này.
+Truy cập bằng HTTPS origin trong `deploy/.runtime/manifest.json` (máy thử hiện tại: `https://192.168.100.4:3443`). Truy cập trực tiếp HTTP cổng 3000 hoặc HTTPS bằng hostname khác sẽ không khớp cấu hình Origin/gateway và bị chặn. Khi Wi-Fi đổi IP, cần tạo lại bộ cấu hình cho IP mới. Không tắt kiểm tra Origin hoặc chữ ký để bỏ qua lỗi này.
 
 ```powershell
 docker compose -p careops-lan -f deploy/.runtime/redis.compose.yml up -d
@@ -63,7 +63,7 @@ npm run schema:apply
 
 `schema:apply` là công cụ additive/idempotent: lưu bản sao schema ở `deploy/backups`, bổ sung cột/độ dài/index còn thiếu, từ chối nếu OTP bị trùng nhóm, không xóa tài khoản hoặc OTP. Đây là bản sao schema, không thay thế backup toàn DB trước một đợt triển khai chính thức. Không chạy lại SQL migration cũ có câu DELETE OTP trên DB đã nâng cấp.
 
-`http://127.0.0.1:3010/health/ready` trả 200 khi Redis sẵn sàng và 503 khi Redis mất kết nối. Backend giữ chặn request khi Redis lỗi, tự reconnect có backoff; không cần tắt rate limit để phục hồi.
+`http://127.0.0.1:3310/health/ready` trả 200 khi Redis sẵn sàng và 503 khi Redis mất kết nối. Backend giữ chặn request khi Redis lỗi, tự reconnect có backoff; không cần tắt rate limit để phục hồi.
 
 SMTP đã kiểm tra được kết nối/xác thực trên máy thử; chưa gửi email tới người dùng. Người kiểm thử tự đăng nhập bằng tài khoản của mình để xác minh OTP đầu cuối. Secret mới của bộ triển khai khiến phiên cũ phải đăng nhập lại.
 
@@ -74,3 +74,11 @@ SMTP đã kiểm tra được kết nối/xác thực trên máy thử; chưa g�
 - Hai repo đều có workflow CI: build, audit production và test. Backend CI có Redis thật; frontend CI có Chromium/HTTPS.
 
 Khi Wi-Fi có client isolation hoặc thiết bị ở subnet khác, cần quản trị mạng cho phép kết nối tới cổng HTTPS; ứng dụng không thể tự bỏ cách ly của router/AP.
+
+## Khôi phục sau khi tắt máy hoặc đổi Wi-Fi
+
+Mở Docker Desktop, sau đó chạy `./scripts/lan-services.ps1 -Action start` tại frontend. Dùng `node scripts/check-lan.cjs` để xem URL hiện tại và kiểm tra gateway/backend/proxy. Máy thử không tự khởi động các tiến trình Node/nginx sau khi Windows tắt.
+
+Nếu IP Wi-Fi đổi, xác minh IP của máy trước rồi chạy `node scripts/prepare-lan-runtime.cjs --host=IP_THUC_TE` khi bộ LAN đã dừng. Công cụ kiểm tra IP được gắn trên máy, giữ nguyên secret và Redis prefix, dùng lại chứng chỉ còn hạn có SAN phù hợp hoặc tạo chứng chỉ thử mới; cổng nội bộ giữ 3300/3310. Với PowerShell Administrator, `./scripts/open-lan-firewall.ps1 -RefreshLocalAddress` chỉ cập nhật IP cục bộ của đúng rule nginx/3443/LocalSubnet đã có. Không tắt kiểm tra Origin hoặc mở 3300/3310 ra mạng.
+
+Bản duyệt việc, việc lặp lại và báo cáo có hướng dẫn chuyển bản riêng tại [WORK_FOUNDATION.md](WORK_FOUNDATION.md).

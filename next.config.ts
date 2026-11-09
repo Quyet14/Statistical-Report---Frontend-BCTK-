@@ -1,7 +1,22 @@
 import type { NextConfig } from "next";
 
+const workDistDir = process.env.CAREOPS_WORK_DIST_DIR;
+if (
+  workDistDir &&
+  !/^\.next-work-release(?:-[A-Za-z0-9._-]+)?$/.test(workDistDir)
+) {
+  throw new Error("CAREOPS_WORK_DIST_DIR must be a dedicated work-release directory");
+}
+
 const nextConfig: NextConfig = {
-  distDir: process.env.CAREOPS_RELEASE === "device" ? ".next-device-release" : ".next",
+  distDir:
+    process.env.CAREOPS_RELEASE === "organization"
+      ? ".next-organization-release"
+      : process.env.CAREOPS_RELEASE === "work"
+        ? workDistDir || ".next-work-release"
+        : process.env.CAREOPS_RELEASE === "device"
+          ? ".next-device-release"
+          : ".next",
   poweredByHeader: false,
   allowedDevOrigins: ["192.168.81.178", "192.168.100.6"],
   async redirects() {

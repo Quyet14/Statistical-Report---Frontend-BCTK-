@@ -1,11 +1,19 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { api } from "@/lib/api";
 import { getStoredUser, type CurrentUser } from "@/lib/auth";
 import type { TaskItem, TaskPriority, TaskStatus } from "@/types";
 import { useFeedback } from "@/context/FeedbackContext";
 import { taskOutcomeFeedback } from "@/lib/feedback";
+import { persistedTaskState } from "@/lib/task-state";
 
 export type TaskDraft = {
   title: string;
@@ -16,19 +24,35 @@ export type TaskDraft = {
   priority: TaskPriority;
   progress: number;
   checklistTitles?: string[];
+  reviewerId?: number;
 };
 
 type TaskContextValue = {
   tasks: TaskItem[];
+  reviewTask: (
+    id: string,
+    action: "submit" | "approve" | "reject" | "reopen",
+    reason?: string,
+  ) => Promise<boolean>;
+  refreshTask: (id: string) => Promise<void>;
   addTask: (task: TaskDraft) => Promise<boolean>;
   updateTask: (id: string, update: Partial<TaskDraft>) => Promise<boolean>;
   deleteTask: (id: string) => Promise<boolean>;
   completeTask: (id: string) => Promise<boolean>;
-  updateChecklistItem: (taskId: string, itemId: number, completed: boolean) => Promise<boolean>;
+  updateChecklistItem: (
+    taskId: string,
+    itemId: number,
+    completed: boolean,
+  ) => Promise<boolean>;
   addChecklistItem: (taskId: string, title: string) => Promise<boolean>;
 };
 
-type RawChecklistItem = { id: number; title: string; completed: boolean };
+type RawChecklistItem = {
+  id: number;
+  title: string;
+  completed: boolean;
+  outcome?: "pending" | "pass" | "fail" | "na";
+};
 
 type RawTask = {
   id: string | number;
@@ -39,6 +63,14 @@ type RawTask = {
   departmentName?: string | null;
   department?: string | null;
   createdById?: number;
+  reviewerId?: number | null;
+  canReview?: boolean;
+  delegatedReview?: boolean;
+  isParticipant?: boolean;
+  approvalSteps?: TaskItem["approvalSteps"];
+  approvalState?: TaskItem["approvalState"];
+  rejectionReason?: string | null;
+  locked?: boolean;
   time?: string;
   dueDate?: string;
   status?: TaskStatus;
@@ -48,24 +80,26 @@ type RawTask = {
   checklist?: RawChecklistItem[];
 };
 
-const userNameMap: Record<number, string> = {
-  1: "Nguyễn Văn A",
-  2: "Trần Thị B",
-  3: "Lê Văn C",
-};
-
 const clampProgress = (value: unknown) => {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue)) return 0;
   return Math.min(Math.max(Math.round(numericValue), 0), 100);
 };
 
-const normalizeTaskState = (status: unknown, progress: unknown): { status: TaskStatus; progress: number } => {
-  const normalizedStatus = status === "done" || status === "doing" || status === "todo" ? status : undefined;
+const normalizeTaskState = (
+  status: unknown,
+  progress: unknown,
+): { status: TaskStatus; progress: number } => {
+  const normalizedStatus =
+    status === "done" || status === "doing" || status === "todo"
+      ? status
+      : undefined;
   const normalizedProgress = clampProgress(progress);
 
-  if (normalizedStatus === "done" || normalizedProgress >= 100) return { status: "done", progress: 100 };
-  if (normalizedStatus === "todo" || normalizedProgress <= 0) return { status: "todo", progress: 0 };
+  if (normalizedStatus === "done" || normalizedProgress >= 100)
+    return { status: "done", progress: 100 };
+  if (normalizedStatus === "todo" || normalizedProgress <= 0)
+    return { status: "todo", progress: 0 };
   return { status: "doing", progress: normalizedProgress };
 };
 
@@ -77,7 +111,7 @@ const normalizePriority = (value: unknown): TaskPriority => {
 };
 
 const normalizeTask = (item: RawTask): TaskItem => {
-  const state = normalizeTaskState(item.status ?? (item.isRecurring ? "todo" : "doing"), item.progress ?? (item.status === "done" ? 100 : 0));
+  const state = persistedTaskState(item);
 
   return {
     id: String(item.id),
@@ -86,7 +120,15 @@ const normalizeTask = (item: RawTask): TaskItem => {
     departmentId: item.departmentId,
     departmentName: item.departmentName ?? item.department,
     createdById: item.createdById,
-    assignee: item.assignee ?? (item.assigneeId != null ? userNameMap[item.assigneeId] : undefined) ?? "Chưa phân công",
+    reviewerId: item.reviewerId,
+    canReview: item.canReview,
+    delegatedReview: item.delegatedReview,
+    isParticipant: item.isParticipant,
+    approvalSteps: item.approvalSteps,
+    approvalState: item.approvalState,
+    rejectionReason: item.rejectionReason,
+    locked: item.locked,
+    assignee: item.assignee ?? "Chưa phân công",
     time: item.time ?? item.dueDate ?? "Chưa có thời gian",
     status: state.status,
     progress: state.progress,
@@ -110,7 +152,11 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         let user: CurrentUser | null = getStoredUser();
         if (user?.id && (user.departmentId == null || !user.departmentName)) {
           try {
-            const profile = await api.get<Pick<CurrentUser, "departmentId" | "departmentName"> & { department?: string }>(`/users/${user.id}`);
+            const profile = await api.get<
+              Pick<CurrentUser, "departmentId" | "departmentName"> & {
+                department?: string;
+              }
+            >(`/users/${user.id}`);
             user = { ...user, departmentId: profile.departmentId };
             user.departmentName = profile.departmentName ?? profile.department;
           } catch {
@@ -120,25 +166,47 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         const departmentHead = user?.role?.toLowerCase() === "manager";
         let departmentTasks = response;
         if (departmentHead) {
-          const users = await api.get<Array<{ id: number; name: string; departmentId?: number | null }>>("/users");
+          const users =
+            await api.get<
+              Array<{ id: number; name: string; departmentId?: number | null }>
+            >("/users");
           const profile = users.find((item) => item.id === user?.id);
           const departmentId = user?.departmentId ?? profile?.departmentId;
-          const departmentUsers = departmentId == null
-            ? new Set<number>()
-            : new Set(users.filter((item) => Number(item.departmentId) === Number(departmentId)).map((item) => item.id));
+          const departmentUsers =
+            departmentId == null
+              ? new Set<number>()
+              : new Set(
+                  users
+                    .filter(
+                      (item) =>
+                        Number(item.departmentId) === Number(departmentId),
+                    )
+                    .map((item) => item.id),
+                );
           const departmentUserNames = new Set(
-            users.filter((item) => departmentUsers.has(item.id)).map((item) => item.name.trim().toLowerCase()),
+            users
+              .filter((item) => departmentUsers.has(item.id))
+              .map((item) => item.name.trim().toLowerCase()),
           );
-          departmentTasks = departmentId == null
-            ? []
-            : response.filter((item) => {
-              if (item.assigneeId != null) return departmentUsers.has(Number(item.assigneeId));
-              return departmentUserNames.has(String(item.assignee ?? "").trim().toLowerCase());
-            });
+          departmentTasks =
+            departmentId == null
+              ? []
+              : response.filter((item) => {
+                  if (item.assigneeId != null)
+                    return departmentUsers.has(Number(item.assigneeId));
+                  return departmentUserNames.has(
+                    String(item.assignee ?? "")
+                      .trim()
+                      .toLowerCase(),
+                  );
+                });
         }
         setTasks(departmentTasks.map(normalizeTask));
       } catch (error) {
-        console.warn("Backend task API unavailable, using fallback data.", error);
+        console.warn(
+          "Backend task API unavailable, using fallback data.",
+          error,
+        );
       }
     };
 
@@ -148,16 +216,22 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   const addTask = async (task: TaskDraft) => {
     const payload = {
       title: task.title.trim(),
-      assigneeId: task.assigneeId ?? Number(Object.keys(userNameMap).find((key) => userNameMap[Number(key)] === task.assignee.trim())),
+      assigneeId: task.assigneeId,
+      reviewerId: task.reviewerId,
       dueDate: task.time.match(/^\d{4}-\d{2}-\d{2}/)?.[0],
       priority: task.priority.toLowerCase(),
-      isRecurring: task.status === "todo",
+      isRecurring: false,
       status: task.status,
       progress: task.progress,
-      checklist: task.checklistTitles?.map((item) => item.trim()).filter(Boolean),
+      checklist: task.checklistTitles
+        ?.map((item) => item.trim())
+        .filter(Boolean),
     };
 
-    const result = await runAction(() => api.post<RawTask>("/tasks", payload), { title: "Đã giao công việc", description: task.title.trim() });
+    const result = await runAction(() => api.post<RawTask>("/tasks", payload), {
+      title: "Đã giao công việc",
+      description: task.title.trim(),
+    });
     if (!result.ok) return false;
     setTasks((currentTasks) => [normalizeTask(result.value), ...currentTasks]);
     return true;
@@ -166,7 +240,10 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   const updateTask = async (id: string, update: Partial<TaskDraft>) => {
     const currentTask = tasks.find((task) => task.id === id);
     if (!currentTask) return false;
-    const nextState = normalizeTaskState(update.status ?? currentTask.status, update.progress ?? currentTask.progress);
+    const nextState = normalizeTaskState(
+      update.status ?? currentTask.status,
+      update.progress ?? currentTask.progress,
+    );
 
     const nextTask = {
       ...currentTask,
@@ -181,55 +258,126 @@ export function TaskProvider({ children }: { children: ReactNode }) {
 
     const payload = {
       title: nextTask.title,
-      assigneeId: nextTask.assigneeId ?? Number(Object.keys(userNameMap).find((key) => userNameMap[Number(key)] === nextTask.assignee)),
+      assigneeId: nextTask.assigneeId,
       dueDate: nextTask.time.match(/^\d{4}-\d{2}-\d{2}/)?.[0],
       priority: nextTask.priority.toLowerCase(),
-      isRecurring: nextTask.status === "todo",
       status: nextTask.status,
       progress: nextTask.progress,
     };
 
-    const result = await runAction(() => api.patch(`/tasks/${id}`, payload), taskOutcomeFeedback(currentTask.status, nextTask.status, nextTask.title));
+    const result = await runAction(
+      () => api.patch<RawTask>(`/tasks/${id}`, payload),
+      (persisted) =>
+        persisted.approvalState === "submitted"
+          ? {
+              title: "Đã gửi công việc chờ duyệt",
+              description: persisted.title,
+            }
+          : taskOutcomeFeedback(
+              currentTask.status,
+              persistedTaskState(persisted).status,
+              persisted.title,
+            ),
+    );
     if (!result.ok) return false;
-    setTasks((currentTasks) =>
-      currentTasks.map((task) => (task.id === id ? nextTask : task)),
+    setTasks((current) =>
+      current.map((task) =>
+        task.id === id ? normalizeTask(result.value) : task,
+      ),
+    );
+    return true;
+  };
+  const updateChecklistItem = async (
+    taskId: string,
+    itemId: number,
+    completed: boolean,
+  ) => {
+    const result = await runAction(
+      () =>
+        api.patch<RawTask>(`/tasks/${taskId}/checklist/${itemId}`, {
+          completed,
+        }),
+      (value) => ({
+        title:
+          value.approvalState === "submitted"
+            ? "Đã gửi công việc chờ duyệt"
+            : "Đã cập nhật checklist",
+        description: value.title,
+      }),
+    );
+    if (!result.ok) return false;
+    setTasks((current) =>
+      current.map((task) =>
+        task.id === taskId ? normalizeTask(result.value) : task,
+      ),
+    );
+    return true;
+  };
+  const addChecklistItem = async (taskId: string, title: string) => {
+    const result = await runAction(
+      () =>
+        api.post<RawTask>(`/tasks/${taskId}/checklist`, {
+          title: title.trim(),
+        }),
+      { title: "Đã thêm mục checklist" },
+    );
+    if (!result.ok) return false;
+    setTasks((current) =>
+      current.map((task) =>
+        task.id === taskId ? normalizeTask(result.value) : task,
+      ),
+    );
+    return true;
+  };
+  const reviewTask = async (
+    id: string,
+    action: "submit" | "approve" | "reject" | "reopen",
+    reason?: string,
+  ) => {
+    const result = await runAction(
+      () =>
+        api.post<RawTask>(`/work/tasks/${id}/review`, {
+          action,
+          ...(reason ? { reason } : {}),
+        }),
+      {
+        title:
+          action === "approve"
+            ? "Đã duyệt hoàn thành"
+            : action === "reject"
+              ? "Đã trả lại công việc"
+              : action === "reopen"
+                ? "Đã mở khóa"
+                : "Đã gửi duyệt",
+      },
+    );
+    if (!result.ok) return false;
+    setTasks((current) =>
+      current.some((task) => task.id === id)
+        ? current.map((task) =>
+            task.id === id ? normalizeTask(result.value) : task,
+          )
+        : [normalizeTask(result.value), ...current],
     );
     return true;
   };
 
-  const updateChecklistItem = async (taskId: string, itemId: number, completed: boolean) => {
-    const currentTask = tasks.find((task) => task.id === taskId);
-    const response = await runAction(() => api.patch<Partial<RawTask>>(`/tasks/${taskId}/checklist/${itemId}`, { completed }), (result) => {
-      const state = normalizeTaskState(result.status ?? currentTask?.status, result.progress ?? currentTask?.progress);
-      return taskOutcomeFeedback(currentTask?.status, state.status, currentTask?.title, completed ? "Đã hoàn thành mục công việc" : "Đã mở lại mục công việc");
-    });
-    if (!response.ok) return false;
-    const result = response.value;
-    setTasks((currentTasks) => currentTasks.map((task) => task.id === taskId
-      ? (() => {
-        const state = normalizeTaskState(result.status ?? task.status, result.progress ?? task.progress);
-        return { ...task, status: state.status, progress: state.progress, checklist: task.checklist?.map((item) => item.id === itemId ? { ...item, completed } : item) };
-      })()
-      : task));
-    return true;
-  };
-
-  const addChecklistItem = async (taskId: string, title: string) => {
-    const response = await runAction(() => api.post<RawChecklistItem & Partial<RawTask>>(`/tasks/${taskId}/checklist`, { title: title.trim() }), { title: "Đã thêm mục công việc", description: title.trim() });
-    if (!response.ok) return false;
-    const item = response.value;
-    setTasks((currentTasks) => currentTasks.map((task) => task.id === taskId
-      ? (() => {
-        const state = normalizeTaskState(item.status ?? task.status, item.progress ?? task.progress);
-        return { ...task, status: state.status, progress: state.progress, checklist: [...(task.checklist ?? []), item] };
-      })()
-      : task));
-    return true;
+  const refreshTask = async (id: string) => {
+    const value = await api.get<RawTask>(`/tasks/${id}`);
+    setTasks((current) =>
+      current.some((task) => task.id === id)
+        ? current.map((task) => (task.id === id ? normalizeTask(value) : task))
+        : [normalizeTask(value), ...current],
+    );
   };
 
   const deleteTask = async (id: string) => {
     const currentTask = tasks.find((task) => task.id === id);
-    const result = await runAction(() => api.del(`/tasks/${id}`), { title: "Đã xóa công việc", description: currentTask?.title, kind: "info" });
+    const result = await runAction(() => api.del(`/tasks/${id}`), {
+      title: "Đã xóa công việc",
+      description: currentTask?.title,
+      kind: "info",
+    });
     if (!result.ok) return false;
     setTasks((currentTasks) => currentTasks.filter((task) => task.id !== id));
     return true;
@@ -249,6 +397,8 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   const value = useMemo<TaskContextValue>(
     () => ({
       tasks,
+      reviewTask,
+      refreshTask,
       addTask,
       updateTask,
       deleteTask,

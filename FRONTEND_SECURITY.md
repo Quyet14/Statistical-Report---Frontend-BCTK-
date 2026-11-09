@@ -1,5 +1,21 @@
 # Frontend và backend trước production
 
+## Cập nhật giao diện trên bộ LAN
+
+Lưu file đã sửa, rồi chạy tại thư mục frontend:
+
+```powershell
+npm run deploy:lan
+```
+
+Lệnh tạo build riêng từ mã hiện tại, sau khi build thành công mới chuyển lựa chọn frontend, khởi động lại bộ LAN và kiểm tra sức khỏe. Nếu chuyển bản thất bại sẽ khôi phục lựa chọn trước đó. Không chạy migration hoặc đổi cấu hình backend. Trình duyệt cần tải lại một lần sau khi chuyển bản.
+
+`npm run build` thông thường tạo `.next` (trừ khi bạn tự đặt biến release), còn bộ LAN dùng thư mục release riêng trong `deploy/.runtime/frontend.env`; vì vậy chỉ chạy build không cập nhật giao diện LAN. Trong lúc build, bản đang phục vụ được giữ nguyên; bước chuyển bản có gián đoạn ngắn.
+
+## Phục hồi hạ tầng ngày 06/11/2026
+
+MariaDB đã phục hồi quyền từ bản BAK lịch sử; kiểm tra 7 bảng quyền và 50 bảng CareOps đạt. Bản sao database mã hóa đã phục hồi thực trên MySQL độc lập. Sao lưu tự động vẫn tắt; chưa xác minh SMTP/OTP thật trong đợt này. Xem [biên nhận và giới hạn](deploy/MYSQL_DEEP_RECOVERY.md).
+
 ## Ghi nhớ thiết bị cá nhân 30 ngày
 
 - Người dùng chủ động chọn ghi nhớ ở lần đăng nhập OTP đầu tiên; mặc định tắt. Cookie `careops_device` HttpOnly/Secure/SameSite=Lax có hạn tuyệt đối 30 ngày, không lưu mật khẩu hoặc token trong localStorage. Redis lưu hash bí mật, hash User-Agent, userId/tokenVersion, trạng thái tự vào lại và hạn tuyệt đối. Đổi IP không tự làm mất ghi nhớ; đổi trình duyệt/User-Agent có thể yêu cầu OTP lại.
@@ -66,7 +82,7 @@ Sinh từng secret độc lập bằng `node -e "console.log(require('node:crypt
 - Khi có thao tác, frontend gia hạn tối đa một lần/phút theo mốc dùng chung giữa các tab; không gia hạn chỉ vì timer chạy. BFF cũng gia hạn trước API nếu access token gần hết hạn/mất cookie, rồi chuyển tiếp thao tác đúng một lần. Không tự gửi lại POST/PATCH sau khi backend đã trả lỗi. Mọi lần gia hạn vẫn kiểm tra gateway/Origin, kể cả GET cần khôi phục phiên qua Referer/Origin cùng nguồn.
 - Frontend cảnh báo trước 60 giây và tự thoát sau 30 phút không hoạt động; kiểm tra lại khi tab hiện lên để không bị timer nền trì hoãn. localStorage chỉ chứa mốc thời gian hoạt động/gia hạn/kết thúc, không chứa thông tin tài khoản hay token. Đóng trình duyệt không kéo dài hạn idle hoặc hạn cứng. Người dùng phiên cũ cần đăng nhập lại một lần để nhận refresh cookie mới. Đổi mật khẩu/khóa tài khoản làm refresh thất bại; logout thu hồi Redis trước khi xóa cookie.
 - 400 hiển thị thông điệp DTO; 429 chờ Retry-After và đếm ngược, không tự retry POST. Quên mật khẩu dùng thông báo chung. Dữ liệu React được escape; không log OTP/mật khẩu/token.
-- Báo cáo chỉ admin; trưởng khoa quản lý nhân viên khoa mình; backend quyết định quyền thực tế.
+- Mẫu báo cáo/lịch gửi chỉ admin; báo cáo tổng hợp cho admin và vai trò chỉ xem theo cấu hình quyền hiện có. Trưởng khoa quản lý nhân viên khoa mình; backend quyết định quyền thực tế.
 
 ## Kiểm tra và các bước chưa thực hiện
 
@@ -81,3 +97,7 @@ Backend: `npm run build`, `npm test -- --runInBand`, `npm audit --omit=dev`.
 Unit/E2E trình duyệt dùng upstream giả lập, không ghi DB nghiệp vụ hay gửi email. Integration Redis chạy với Redis thử nghiệm riêng và kiểm tra gián đoạn/kết nối lại. Máy LAN đã được bổ sung unique index OTP bằng công cụ additive có bản sao schema; không có bản ghi bị xóa. SMTP đã xác minh kết nối, chưa gửi OTP thật. Trước chuyển server nội bộ cần backup toàn DB, kiểm tra schema và dùng chứng chỉ CA nội bộ, rồi xác minh đăng nhập → OTP → thao tác theo quyền → hết phiên trên máy đích.
 
 Tham chiếu: [OWASP CSRF](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html), [Next.js CSP](https://nextjs.org/docs/app/guides/content-security-policy), [express-rate-limit stores](https://express-rate-limit.mintlify.app/reference/stores).
+
+## Ngoại tuyến có kiểm soát
+
+Người dùng xác nhận thiết bị cá nhân rồi chủ động lưu tối đa 50 việc mình thực hiện/phối hợp. IndexedDB chỉ giữ bản mã hóa bằng mật khẩu ngoại tuyến riêng, hạn 24 giờ, xóa khi đăng xuất chủ động và ngăn tab cũ tạo hồi dữ liệu. Service worker chỉ cache bốn file tĩnh, không cache API/HTML tài khoản. Chỉ sửa tick; đồng bộ phải đăng nhập đúng người, kiểm tra quyền và xung đột, không tự ghi đè. Chữ ký/số/duyệt cần mạng. [Chính sách và giới hạn đầy đủ](deploy/COORDINATION_RELEASE.md).

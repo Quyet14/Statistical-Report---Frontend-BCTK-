@@ -1,0 +1,148 @@
+.task-collaboration {
+  margin-top: 12px;
+  border: 1px solid #dce3f2;
+  background: #f8faff;
+  color: #375573;
+  border-radius: 12px;
+}
+.task-collaboration > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 12px;
+  cursor: pointer;
+}
+.task-collaboration > summary span {
+  font-size: 11px;
+  font-weight: 500;
+}
+.task-collaboration-body {
+  padding: 0 12px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.task-collaboration-body section + section {
+  border-top: 1px solid #e1e7f0;
+  margin-top: 14px;
+  padding-top: 12px;
+}
+.task-collaboration h4 {
+  font-size: 14px;
+  margin: 12px 0 8px;
+  color: #315789;
+}
+.task-collaboration label {
+  display: grid;
+  gap: 6px;
+  margin: 9px 0;
+}
+.task-collaboration input:not([type="checkbox"]),
+.task-collaboration select,
+.task-collaboration textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #ccdcec;
+  border-radius: 8px;
+  padding: 9px;
+  background: #fff;
+  color: #345575;
+  font: inherit;
+}
+.task-collaboration textarea {
+  min-height: 85px;
+  resize: vertical;
+}
+.task-collaboration button {
+  border: 1px solid #ccdbed;
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: #fff;
+  color: #385ba0;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  margin: 4px 0;
+}
+.task-collaboration button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.task-collaboration details > summary {
+  cursor: pointer;
+  padding: 8px 0;
+}
+.collaboration-people {
+  max-height: 230px;
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 4px;
+}
+.collaboration-people label,
+.collaboration-check {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 9px !important;
+  margin: 2px 0 !important;
+  padding: 7px;
+  font-size: 13px;
+}
+.collaboration-people input,
+.collaboration-check input {
+  margin-top: 4px;
+  flex-shrink: 0;
+  accent-color: #4473b6;
+}
+.collaboration-field {
+  padding: 12px;
+  margin: 9px 0;
+  background: #fff;
+  border: 1px solid #e0e8f3;
+  border-radius: 10px;
+}
+.approval-timeline {
+  margin: 10px 0;
+  padding: 0 0 0 20px;
+}
+.approval-timeline li {
+  padding: 6px 0 12px 4px;
+  border-left: 2px solid #d9e4f1;
+}
+.approval-timeline strong,
+.approval-timeline span {
+  display: block;
+}
+.approval-timeline .approval-step-approved {
+  color: #13745e;
+  border-color: #54b29a;
+}
+.approval-timeline .approval-step-rejected {
+  color: #ad3b51;
+  border-color: #de8393;
+}
+.collaboration-comments article {
+  margin-top: 12px;
+  padding: 12px;
+  background: white;
+  border: 1px solid #e1e8f1;
+  border-radius: 10px;
+}
+.collaboration-comments time {
+  display: block;
+  font-size: 11px;
+  color: #73869c;
+}
+.collaboration-comments p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.task-approval-summary {
+  margin-top: 8px;
+  padding-left: 18px;
+}
+.task-approval-summary li {
+  padding: 3px 0;
+}

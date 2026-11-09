@@ -6,6 +6,7 @@
     "dev": "next dev",
     "server": "node server.js",
     "build": "next build",
+    "deploy:lan": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-lan-frontend.ps1",
     "start": "next start",
     "lint": "eslint",
     "test": "node --test --test-isolation=none tests/*.test.cjs",

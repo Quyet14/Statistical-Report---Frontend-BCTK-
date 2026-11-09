@@ -1,5 +1,5 @@
 #Requires -RunAsAdministrator
-param([string]$ConfigDirectory, [switch]$Remove)
+param([string]$ConfigDirectory, [switch]$Remove, [switch]$RefreshLocalAddress)
 $ErrorActionPreference = 'Stop'
 $frontendRoot = Split-Path -Parent $PSScriptRoot
 if (!$ConfigDirectory) { $ConfigDirectory = Join-Path $frontendRoot 'deploy/.runtime' }
@@ -28,7 +28,11 @@ if ($existing) {
     $application = $existing | Get-NetFirewallApplicationFilter
     $ports = $existing | Get-NetFirewallPortFilter
     $addresses = $existing | Get-NetFirewallAddressFilter
-    if ($application.Program -ne $program -or $ports.LocalPort -ne $port -or $addresses.RemoteAddress -notcontains 'LocalSubnet' -or $addresses.LocalAddress -notcontains $address.IPAddressToString) { throw 'Existing rule differs. Review it rather than overwriting.' }
+    if ($application.Program -ne $program -or $ports.LocalPort -ne $port -or $addresses.RemoteAddress -notcontains 'LocalSubnet' -or $existing.Direction -ne 'Inbound' -or $existing.Action -ne 'Allow') { throw 'Existing rule scope differs. No change made.' }
+    if ($addresses.LocalAddress -notcontains $address.IPAddressToString) {
+        if (!$RefreshLocalAddress -or !(Get-NetIPAddress -AddressFamily IPv4 -IPAddress $address.IPAddressToString -ErrorAction SilentlyContinue)) { throw 'Local address changed. Use -RefreshLocalAddress only for an IP assigned to this machine.' }
+        $addresses | Set-NetFirewallAddressFilter -LocalAddress $address.IPAddressToString
+    }
 } else {
     New-NetFirewallRule -Name $ruleName -DisplayName "CareOps HTTPS LAN test $port" -Direction Inbound -Action Allow -Protocol TCP -LocalPort $port -LocalAddress $address.IPAddressToString -RemoteAddress LocalSubnet -Program $program -Profile Any | Out-Null
 }

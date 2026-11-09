@@ -1,0 +1,167 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, sans-serif;
+  color: #203c50;
+  background: #edf5f8;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(ellipse at top right, #c7eee4, transparent 65%);
+}
+main {
+  max-width: 880px;
+  margin: 32px auto;
+  padding: 28px;
+  background: #ffffffed;
+  border: 1px solid #d4e5eb;
+  border-radius: 24px;
+  box-shadow: 0 18px 60px #1a4a6014;
+}
+h1 {
+  font-size: clamp(26px, 5vw, 38px);
+  margin: 10px 0;
+}
+h2 {
+  font-size: 21px;
+}
+.eyebrow {
+  color: #0c7a6d;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+.notice {
+  background: #eef7fb;
+  padding: 16px;
+  border-radius: 12px;
+  line-height: 1.65;
+}
+label {
+  display: block;
+  font-weight: 650;
+}
+input[type="password"] {
+  width: 100%;
+  padding: 14px;
+  border: 1px solid #b0c9d4;
+  border-radius: 10px;
+  font: inherit;
+  margin: 10px 0;
+}
+button,
+a {
+  font: inherit;
+}
+button {
+  background: #087e70;
+  color: #fff;
+  border: 1px solid transparent;
+  padding: 11px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 650;
+  margin: 4px 4px 4px 0;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.secondary {
+  background: #edf2fa;
+  color: #34547d;
+}
+.danger {
+  background: #fff1f1;
+  color: #b43c48;
+  border-color: #f3d4d7;
+}
+a {
+  color: #125c96;
+}
+footer,
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 22px 0;
+}
+article {
+  border: 1px solid #d9e6ec;
+  border-radius: 16px;
+  padding: 18px;
+  margin: 15px 0;
+  background: white;
+  box-shadow: 0 4px 12px #20445808;
+}
+article h2 {
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+.meta {
+  font-size: 14px;
+  color: #647787;
+}
+article label {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-weight: 500;
+  padding: 12px 0;
+  border-top: 1px solid #edf2f6;
+  overflow-wrap: anywhere;
+}
+input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: #087e70;
+  flex-shrink: 0;
+}
+#message {
+  color: #9c3e27;
+  white-space: pre-line;
+}
+dialog {
+  max-width: 620px;
+  width: calc(100% - 32px);
+  border: 1px solid #ccdce4;
+  border-radius: 20px;
+  padding: 24px;
+  color: inherit;
+}
+dialog::backdrop {
+  background: #142b4c88;
+}
+dialog p {
+  line-height: 1.6;
+}
+#comparison {
+  max-height: 45vh;
+  overflow: auto;
+}
+#comparison p {
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+}
+:focus-visible {
+  outline: 3px solid #33a99c;
+  outline-offset: 3px;
+}
+[hidden] {
+  display: none !important;
+}
+@media (max-width: 600px) {
+  main {
+    margin: 12px;
+    padding: 20px;
+    border-radius: 18px;
+  }
+  .toolbar button {
+    width: 100%;
+  }
+}

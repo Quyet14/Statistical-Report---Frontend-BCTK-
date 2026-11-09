@@ -7,8 +7,8 @@ const sessionCookie = "careops_session";
 const refreshCookie = "careops_refresh";
 const deviceCookie = "careops_device";
 type Tokens = { accessToken: string; refreshToken: string; sessionExpiresAt?: number; deviceToken?: string; deviceExpiresAt?: number; user: unknown };
-const publicAuth = new Set(["auth/login", "auth/verify-login-otp", "auth/forgot-password", "auth/reset-password"]);
-const roots = new Set(["auth", "users", "departments", "branches", "tasks", "kpi", "reports", "task-logs", "notifications"]);
+const publicAuth = new Set(["auth/login", "auth/verify-login-otp", "auth/forgot-password", "auth/reset-password", "auth/initial-password-change"]);
+const roots = new Set(["auth", "users", "departments", "branches", "tasks", "kpi", "reports", "task-logs", "notifications", "work", "organization", "advanced-operations", "hospital-operations", "operations"]);
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/" };
 function clearSession(response: NextResponse) {
   for (const name of [sessionCookie, refreshCookie, "accessToken", "refreshToken"]) response.cookies.set(name, "", { ...cookieOptions, maxAge: 0 });
@@ -35,10 +35,28 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
   if (!path.length || !roots.has(path[0]) || path.some((part) => !/^[a-zA-Z0-9_-]+$/.test(part))) return json("Not found", 404);
   const endpoint = path.join("/");
   const writing = !["GET", "HEAD"].includes(request.method);
+  const employeeImportUpload =
+    request.method === "POST" &&
+    ["users/import/preview", "users/import/commit"].includes(endpoint);
+  const evidenceUpload =
+    request.method === "POST" &&
+    /^tasks\/\d+\/attachments$/.test(endpoint);
+  const multipartUpload = employeeImportUpload || evidenceUpload;
+  const evidenceDownload =
+    request.method === "GET" &&
+    /^tasks\/\d+\/attachments\/\d+\/file$/.test(endpoint);
+  const evidencePreview =
+    evidenceDownload && new URL(request.url).searchParams.get("preview") === "true";
+  const contentType = request.headers.get("content-type") ?? "";
   if (writing) {
     try { if (!verifiedWriteOrigin(request.headers)) return json("Không thể xác minh nguồn yêu cầu", 403, "INVALID_REQUEST_ORIGIN"); }
     catch { return json("Chưa cấu hình origin frontend", 503); }
-    if (["POST", "PATCH", "PUT"].includes(request.method) && request.headers.get("content-type")?.split(";")[0].trim() !== "application/json") return json("JSON required", 415);
+    if (["POST", "PATCH", "PUT"].includes(request.method)) {
+      const jsonRequest = contentType.split(";")[0].trim() === "application/json";
+      const uploadForm = multipartUpload &&
+        /^multipart\/form-data\s*;.*\bboundary=/i.test(contentType);
+      if (!jsonRequest && !uploadForm) return json("Unsupported request content type", 415);
+    }
   }
   const logout = ["auth/logout", "auth/end-session", "auth/forget-device"].includes(endpoint);
   const deviceStatus = endpoint === "auth/device-status";
@@ -61,7 +79,8 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
         const { done, value } = await reader.read();
         if (done) break;
         size += value.byteLength;
-        if (size > 65536) { await reader.cancel(); return json("Dữ liệu vượt quá giới hạn", 413); }
+        const maxBodySize = employeeImportUpload ? 2 * 1024 * 1024 + 65536 : evidenceUpload ? 5 * 1024 * 1024 + 65536 : 65536;
+        if (size > maxBodySize) { await reader.cancel(); return json("Dữ liệu vượt quá giới hạn", 413); }
         chunks.push(value);
       }
       body = new Uint8Array(size);
@@ -74,9 +93,11 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
     if (!["http:", "https:"].includes(base.protocol) || (process.env.NODE_ENV === "production" && base.protocol !== "https:" && !["localhost", "127.0.0.1", "[::1]"].includes(base.hostname))) return json("Cấu hình máy chủ không hợp lệ", 503);
     const upstreamUrl = new URL(endpoint, base);
     upstreamUrl.search = new URL(request.url).search;
-    let clientHeaders;
+    if (evidencePreview) upstreamUrl.searchParams.delete("preview");
+    let clientHeaders: Record<string, string>;
     try { clientHeaders = signedClientHeaders(request.headers, request.method, upstreamUrl); }
     catch (error) { return error instanceof SecurityConfigurationError ? json("Chưa cấu hình proxy tin cậy", 503) : json("Không thể xác minh proxy đầu vào", 403, "UNTRUSTED_GATEWAY"); }
+    if (multipartUpload) clientHeaders["Content-Type"] = contentType;
     async function callSession(action: "refresh" | "logout" | "end-session" | "resume-device" | "device-status" | "forget-device") {
       const url = new URL(`auth/${action}`, base);
       const fields = action === "refresh" || action === "end-session" ? { refreshToken } : { ...(action === "logout" || action === "forget-device" ? { refreshToken } : {}), deviceToken, ...(deviceToken ? { userAgent: (request.headers.get("user-agent") ?? "").slice(0, 512) } : {}) };
@@ -160,9 +181,32 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
       if (!result.deviceToken) clearDevice(response);
       return setSession(response, result);
     }
-    const payload = restored && endpoint === "auth/me" && upstream.ok ? JSON.stringify({ ...await upstream.json(), sessionRestored: true }) : upstream.status === 204 || request.method === "HEAD" ? null : await upstream.text();
+    const payload = restored && endpoint === "auth/me" && upstream.ok
+      ? JSON.stringify({ ...await upstream.json(), sessionRestored: true })
+      : upstream.status === 204 || request.method === "HEAD"
+        ? null
+        : evidenceDownload && upstream.ok
+          ? new Uint8Array(await upstream.arrayBuffer())
+          : await upstream.text();
     const response = new NextResponse(payload, { status: upstream.status, headers });
-    response.headers.set("Content-Type", upstream.headers.get("content-type")?.includes("application/json") ? "application/json" : "text/plain; charset=utf-8");
+    response.headers.set(
+      "Content-Type",
+      evidenceDownload && upstream.ok
+        ? upstream.headers.get("content-type") ?? "application/octet-stream"
+        : upstream.headers.get("content-type")?.includes("application/json")
+          ? "application/json"
+          : "text/plain; charset=utf-8",
+    );
+    if (evidenceDownload && upstream.ok) {
+      const contentType = (upstream.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+      if (evidencePreview && ["image/jpeg", "image/png", "application/pdf"].includes(contentType)) {
+        response.headers.set("Content-Disposition", "inline");
+      } else {
+        const disposition = upstream.headers.get("content-disposition");
+        if (disposition?.startsWith("attachment; filename*="))
+          response.headers.set("Content-Disposition", disposition);
+      }
+    }
     if (upstream.status === 401 && !isPublic) clearSession(response);
     else if (renewed) setSession(response, renewed);
     if (endpoint === "auth/reset-password" && upstream.ok) clearDevice(clearSession(response));

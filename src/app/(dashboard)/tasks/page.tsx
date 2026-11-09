@@ -46,7 +46,6 @@ export default function TasksPage() {
         <div>
           <span className="eyebrow">Thực thi</span>
           <h3 className="page-title">Quản lý nhiệm vụ</h3>
-          <p className="page-description">Điều phối đúng người, nắm rõ tiến độ và chủ động với mọi thời hạn.</p>
         </div>
       </div>
 

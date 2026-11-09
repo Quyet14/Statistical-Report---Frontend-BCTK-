@@ -1,12 +1,15 @@
 "use client";
+import { WorkspaceGalaxy } from "./GalaxyBackdrop";
+import { noticeLink } from "@/lib/notice-link";
+import { GlobalSearch } from "./GlobalSearch";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { clearTokens, getStoredUser } from "@/lib/auth";
 import { useFeedback } from "@/context/FeedbackContext";
 import { api } from "@/lib/api";
 import { useTasks } from "@/context/TaskContext";
-import { BellOutlined, SearchOutlined, PlusOutlined } from "@ant-design/icons";
+import { BellOutlined, PlusOutlined } from "@ant-design/icons";
 import { WorkspaceSculpture } from "@/components/common/WorkspaceSculpture";
 
 const defaultForm = {
@@ -18,15 +21,17 @@ const defaultForm = {
   priority: "Medium" as const,
   progress: 0,
   checklistText: "",
+  reviewerId: undefined as number | undefined,
 };
 
-type UserOption = { id: number; name: string; email: string; role?: string };
+type UserOption = { id: number; name: string; email?: string; role?: string; departmentId?: number | null };
 type NotificationItem = {
   id: number;
   taskId: number;
   title: string;
   message: string;
-  type: "upcoming" | "overdue";
+  type: "upcoming" | "overdue" | "mention" | "handoff" | "approval";
+  href?: string;
   readAt?: string | null;
   createdAt: string;
 };
@@ -34,7 +39,8 @@ type DisplayNotification = {
   id: string;
   title: string;
   message: string;
-  type: "upcoming" | "overdue" | "assignment" | "done";
+  type: "upcoming" | "overdue" | "assignment" | "done" | "mention" | "handoff" | "approval";
+  href?: string;
   readAt?: string | null;
   createdAt: string;
   apiId?: number;
@@ -48,6 +54,7 @@ const addDays = (date: Date, days: number) => {
 };
 
 export function AppHeader() {
+  const pathname = usePathname();
   const { notify } = useFeedback();
   const router = useRouter();
   const headerRef = useRef<HTMLElement>(null);
@@ -73,14 +80,10 @@ export function AppHeader() {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [form, setForm] = useState(defaultForm);
   const [users, setUsers] = useState<UserOption[]>([]);
+  const [reviewers, setReviewers] = useState<UserOption[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const normalizedSearch = searchQuery.trim().toLowerCase();
-  const searchResults = normalizedSearch
-    ? tasks.filter((task) => [task.title, task.assignee, task.departmentName, task.department].some((value) => value?.toLowerCase().includes(normalizedSearch))).slice(0, 6)
-    : [];
   const displayNotifications = useMemo<DisplayNotification[]>(() => {
     const apiNotifications = notifications.map((item) => ({
       id: `api-${item.id}`,
@@ -90,6 +93,7 @@ export function AppHeader() {
       readAt: item.readAt,
       createdAt: item.createdAt,
       apiId: item.id,
+      href: item.href,
     }));
     if (apiNotifications.length > 0) return apiNotifications;
 
@@ -150,9 +154,9 @@ export function AppHeader() {
   }, [currentUser?.id]);
 
   useEffect(() => {
-    if (currentUser?.role !== "admin" && currentUser?.role !== "manager") return;
-    void api.get<UserOption[]>("/users")
-      .then((items) => setUsers(items.filter((user) => user.role?.toLowerCase() !== "admin")))
+    if (!currentUser || !["admin","manager","leader"].includes(currentUser.role)) return;
+    void api.get<{ assignees: UserOption[]; reviewers: UserOption[] }>("/work/lookups")
+      .then((items) => { setUsers(items.assignees); setReviewers(items.reviewers); })
       .catch(() => setUsers([]));
   }, [currentUser]);
 
@@ -190,7 +194,7 @@ export function AppHeader() {
 
   return (
     <>
-      <header ref={headerRef} className={`workspace-masthead${isCompact ? " is-compact" : ""}`} aria-label="Không gian làm việc Bệnh viện Hữu Nghị">
+      <header ref={headerRef} className={`workspace-masthead${isCompact ? " is-compact" : ""}${pathname === "/checklist" ? "" : " masthead-toolbar-only"}`} aria-label="Không gian làm việc Bệnh viện Hữu Nghị">
       <div className="topbar">
         <div className="topbar-title-group">
           <p className="topbar-title">BỆNH VIỆN HỮU NGHỊ</p>
@@ -198,33 +202,9 @@ export function AppHeader() {
         </div>
 
         <div className="topbar-actions">
-          <div className="search-box">
-            <SearchOutlined className="search-icon" aria-hidden="true" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Tìm việc, nhân sự, khoa/phòng..."
-              aria-label="Tìm công việc, nhân sự, khoa phòng"
-            />
-            {normalizedSearch ? (
-              <div className="search-results" role="listbox" aria-label="Kết quả tìm kiếm">
-                {searchResults.length ? searchResults.map((task) => (
-                  <button
-                    key={task.id}
-                    type="button"
-                    className="search-result"
-                    onClick={() => { setSearchQuery(""); router.push("/tasks"); }}
-                  >
-                    <strong>{task.title}</strong>
-                    <span>{task.assignee} · {task.departmentName ?? task.department ?? "Chưa có phòng ban"}</span>
-                  </button>
-                )) : <div className="search-empty">Không tìm thấy task phù hợp</div>}
-              </div>
-            ) : null}
-          </div>
+          <GlobalSearch />
 
-          {currentUser?.role === "admin" || currentUser?.role === "manager" ? (
+          {currentUser && ["admin","manager","leader"].includes(currentUser.role) ? (
             <button className="primary-action" type="button" onClick={() => setIsOpen(true)}>
               <PlusOutlined aria-hidden="true" /> Giao việc
             </button>
@@ -260,7 +240,7 @@ export function AppHeader() {
                             : notification));
                         });
                       }
-                      router.push("/tasks");
+                      router.push(noticeLink(item.href));
                       setIsNotificationsOpen(false);
                     }}
                   >
@@ -298,16 +278,14 @@ export function AppHeader() {
         </div>
       </div>
       </header>
-      <div className="workspace-banner">
+      {pathname === "/checklist" ? <div className="workspace-banner">
         <section className="workspace-hero" aria-labelledby="workspace-welcome">
           <div className="workspace-hero-copy">
-            <span className="hero-kicker"><span /> KHÔNG GIAN LÀM VIỆC · HUUNGHI CAREOPS</span>
             <h2 id="workspace-welcome"><span>Một ngày hiệu quả.</span><em>Cùng nhau tạo khác biệt.</em></h2>
-            <p>Sắp xếp công việc rõ ràng, kết nối đội ngũ và dành trọn tâm huyết cho những điều quan trọng.</p>
           </div>
-          <div className="masthead-art"><WorkspaceSculpture /></div>
+          <div className="masthead-art"><WorkspaceGalaxy /><WorkspaceSculpture /></div>
         </section>
-      </div>
+      </div> : null}
 
       {isOpen ? (
         <div className="modal-backdrop" onClick={() => setIsOpen(false)}>
@@ -339,7 +317,7 @@ export function AppHeader() {
                     value={form.assigneeId || ""}
                     onChange={(event) => {
                       const user = users.find((item) => item.id === Number(event.target.value));
-                      setForm((current) => ({ ...current, assigneeId: Number(event.target.value), assignee: user?.name ?? "" }));
+                      setForm((current) => ({ ...current, assigneeId: Number(event.target.value), assignee: user?.name ?? "", reviewerId: undefined }));
                     }}
                     required
                   >
@@ -360,10 +338,11 @@ export function AppHeader() {
                 </label>
               </div>
 
+              <label>Người duyệt<select value={form.reviewerId ?? ""} onChange={event => setForm(current => ({ ...current, reviewerId: Number(event.target.value) || undefined }))}><option value="">Không yêu cầu duyệt</option>{reviewers.filter(person => person.id !== form.assigneeId && (person.role === "admin" || (person.departmentId != null && person.departmentId === users.find(item => item.id === form.assigneeId)?.departmentId))).map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select><small>Việc cần duyệt chỉ được tính hoàn thành sau khi người duyệt xác nhận.</small></label>
               <div className="task-form-row">
                 <label>
                   Trạng thái
-                  <select name="status" value={form.status} onChange={handleChange}>
+                  <select name="status" value={form.status} onChange={handleChange} disabled>
                     <option value="todo">Chưa bắt đầu</option>
                     <option value="doing">Đang làm</option>
                     <option value="done">Hoàn thành</option>
@@ -384,6 +363,7 @@ export function AppHeader() {
                 Tiến độ
                 <input
                   name="progress"
+                  disabled
                   type="range"
                   min="0"
                   max="100"
@@ -402,7 +382,6 @@ export function AppHeader() {
                   placeholder={"Mỗi dòng là một công việc\nVí dụ: Kiểm tra tài liệu\nGửi báo cáo cho trưởng phòng"}
                   rows={4}
                 />
-                <span className="form-hint">Mỗi dòng sẽ trở thành một mục để người nhận tích hoàn thành.</span>
               </label>
 
               <div className="task-modal-actions">

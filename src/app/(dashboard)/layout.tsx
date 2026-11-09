@@ -6,6 +6,7 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { TaskProvider } from "@/context/TaskContext";
 import { InteractiveSurfaces } from "@/components/layout/InteractiveSurfaces";
 import { FeedbackProvider } from "@/context/FeedbackContext";
+import { GalaxyBackdrop } from "@/components/layout/GalaxyBackdrop";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
@@ -14,6 +15,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <FeedbackProvider>
         <TaskProvider>
           <div className="dashboard-shell">
+            <GalaxyBackdrop />
             <AppSidebar />
 
             <div className="dashboard-main">

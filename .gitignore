@@ -44,3 +44,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 /.next-device-release/
+/.next-work-release/
+/.next-organization-release/
+/.next-work-release-*/

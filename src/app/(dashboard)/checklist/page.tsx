@@ -1,11 +1,18 @@
 "use client";
 
 import { TaskCard } from "@/components/checklist/TaskCard";
+import { TaskWorkflowPanel } from "@/components/checklist/TaskWorkflowPanel";
+import { RoleDashboard } from "@/components/checklist/RoleDashboard";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, type DragEvent } from "react";
 import { useTasks } from "@/context/TaskContext";
 import { getStoredUser, type CurrentUser } from "@/lib/auth";
 import type { TaskStatus } from "@/types";
-import { CheckCircleOutlined, ClockCircleOutlined, PlayCircleOutlined } from "@ant-design/icons";
+import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  PlayCircleOutlined,
+} from "@ant-design/icons";
 
 const getLocalDate = () => {
   const now = new Date();
@@ -23,9 +30,17 @@ const getWeekBounds = (date: Date) => {
 const dateKey = (value?: string) => value?.slice(0, 10);
 
 const kanbanColumns: { status: TaskStatus; title: string; hint: string }[] = [
-  { status: "todo", title: "Chờ xử lý", hint: "Việc mới giao hoặc chưa bắt đầu" },
+  {
+    status: "todo",
+    title: "Chờ xử lý",
+    hint: "Việc mới giao hoặc chưa bắt đầu",
+  },
   { status: "doing", title: "Đang làm", hint: "Đang được khoa/phòng xử lý" },
-  { status: "done", title: "Hoàn thành", hint: "Đã kết thúc hoặc đã được ghi nhận" },
+  {
+    status: "done",
+    title: "Hoàn thành",
+    hint: "Đã kết thúc hoặc đã được ghi nhận",
+  },
 ];
 
 const progressByStatus: Record<TaskStatus, number> = {
@@ -37,13 +52,25 @@ const progressByStatus: Record<TaskStatus, number> = {
 const getStoredChecklistFilter = () => {
   if (typeof window === "undefined") return "week";
   const saved = window.localStorage.getItem("checklist-range");
-  return saved === "today" || saved === "week" || saved === "all" ? saved : "week";
+  return saved === "today" || saved === "week" || saved === "all"
+    ? saved
+    : "week";
 };
 
 export default function ChecklistPage() {
-  const { tasks, updateTask, deleteTask, updateChecklistItem, addChecklistItem } = useTasks();
+  const router = useRouter();
+  const {
+    tasks,
+    updateTask,
+    deleteTask,
+    updateChecklistItem,
+    addChecklistItem,
+  } = useTasks();
   const [currentUser] = useState<CurrentUser | null>(() => getStoredUser());
-  const [filter, setFilter] = useState<"today" | "week" | "all">(getStoredChecklistFilter);
+  const readOnly = currentUser?.role === "viewer";
+  const [filter, setFilter] = useState<"today" | "week" | "all">(
+    getStoredChecklistFilter,
+  );
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
 
   const selectedDate = getLocalDate();
@@ -56,7 +83,10 @@ export default function ChecklistPage() {
       if (!taskDate) return false;
       if (filter === "today") return taskDate === selectedDate;
       const date = new Date(`${taskDate}T00:00:00`);
-      return date >= new Date(weekStart.toDateString()) && date <= new Date(weekEnd.toDateString());
+      return (
+        date >= new Date(weekStart.toDateString()) &&
+        date <= new Date(weekEnd.toDateString())
+      );
     });
     if (!hasTasksInFilter) {
       window.localStorage.setItem("checklist-range", "all");
@@ -70,14 +100,37 @@ export default function ChecklistPage() {
     if (filter === "all") return true;
     if (filter === "today") return taskDate === selectedDate;
     const date = new Date(`${taskDate}T00:00:00`);
-    return date >= new Date(weekStart.toDateString()) && date <= new Date(weekEnd.toDateString());
+    return (
+      date >= new Date(weekStart.toDateString()) &&
+      date <= new Date(weekEnd.toDateString())
+    );
   });
   const summaryCards = [
-    { label: "Hoàn thành", value: visibleTasks.filter((task) => task.status === "done").length, tone: "green", icon: CheckCircleOutlined, hint: "Đã hoàn tất công việc" },
-    { label: "Đang làm", value: visibleTasks.filter((task) => task.status === "doing").length, tone: "blue", icon: PlayCircleOutlined, hint: "Đang được triển khai" },
-    { label: "Chưa bắt đầu", value: visibleTasks.filter((task) => task.status === "todo").length, tone: "red", icon: ClockCircleOutlined, hint: "Sẵn sàng để bắt đầu" },
+    {
+      label: "Hoàn thành",
+      value: visibleTasks.filter((task) => task.status === "done").length,
+      tone: "green",
+      icon: CheckCircleOutlined,
+      hint: "Đã hoàn tất công việc",
+    },
+    {
+      label: "Đang làm",
+      value: visibleTasks.filter((task) => task.status === "doing").length,
+      tone: "blue",
+      icon: PlayCircleOutlined,
+      hint: "Đang được triển khai",
+    },
+    {
+      label: "Chưa bắt đầu",
+      value: visibleTasks.filter((task) => task.status === "todo").length,
+      tone: "red",
+      icon: ClockCircleOutlined,
+      hint: "Sẵn sàng để bắt đầu",
+    },
   ];
-  const completionRate = visibleTasks.length ? Math.round(summaryCards[0].value / visibleTasks.length * 100) : 0;
+  const completionRate = visibleTasks.length
+    ? Math.round((summaryCards[0].value / visibleTasks.length) * 100)
+    : 0;
 
   const moveTaskToStatus = (taskId: string, status: TaskStatus) => {
     const task = tasks.find((item) => item.id === taskId);
@@ -101,7 +154,16 @@ export default function ChecklistPage() {
         </div>
 
         <div className="toolbar">
-          <select className="soft-select" value={filter} onChange={(event) => { const value = event.target.value as "today" | "week" | "all"; setFilter(value); window.localStorage.setItem("checklist-range", value); }} aria-label="Chọn khoảng thời gian">
+          <select
+            className="soft-select"
+            value={filter}
+            onChange={(event) => {
+              const value = event.target.value as "today" | "week" | "all";
+              setFilter(value);
+              window.localStorage.setItem("checklist-range", value);
+            }}
+            aria-label="Chọn khoảng thời gian"
+          >
             <option value="today">Hôm nay</option>
             <option value="week">Tuần này</option>
             <option value="all">Tất cả công việc</option>
@@ -109,26 +171,41 @@ export default function ChecklistPage() {
         </div>
       </div>
 
-      <div className="stats-grid">
+      <RoleDashboard fallback={<div className="stats-grid">
         {summaryCards.map((item) => (
           <div key={item.label} className={`stat-card ${item.tone}`}>
-            <span className="stat-icon"><item.icon aria-hidden="true" /></span>
+            <span className="stat-icon">
+              <item.icon aria-hidden="true" />
+            </span>
             <span className="stat-label">{item.label}</span>
             <div className="stat-value">{item.value}</div>
           </div>
         ))}
-      </div>
+      </div>} />
 
       <div className="board-heading" id="work-board">
         <h3>Bảng công việc</h3>
         <div className="board-summary">
-          <span>{visibleTasks.length} công việc · {completionRate}% hoàn thành</span>
-          <div className="board-progress" role="progressbar" aria-label="Tỷ lệ công việc hoàn thành" aria-valuemin={0} aria-valuemax={100} aria-valuenow={completionRate}><span style={{ width: `${completionRate}%` }} /></div>
+          <span>
+            {visibleTasks.length} công việc · {completionRate}% hoàn thành
+          </span>
+          <div
+            className="board-progress"
+            role="progressbar"
+            aria-label="Tỷ lệ công việc hoàn thành"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={completionRate}
+          >
+            <span style={{ width: `${completionRate}%` }} />
+          </div>
         </div>
       </div>
       <div className="kanban-board">
         {kanbanColumns.map((column) => {
-          const columnTasks = visibleTasks.filter((task) => task.status === column.status);
+          const columnTasks = visibleTasks.filter(
+            (task) => task.status === column.status,
+          );
 
           return (
             <section
@@ -140,50 +217,77 @@ export default function ChecklistPage() {
               <div className="kanban-column-header">
                 <div>
                   <h4>{column.title}</h4>
-                  <span>{column.hint}</span>
                 </div>
                 <strong>{columnTasks.length}</strong>
               </div>
 
               <div className="kanban-column-body">
-                {columnTasks.length ? columnTasks.map((task) => {
-                  const canManage = currentUser?.role?.toLowerCase() === "admin" || task.createdById === currentUser?.id;
-                  return (
-                    <div
-                      key={task.id}
-                      className="kanban-card-wrap"
-                      draggable
-                      onDragStart={(event) => {
-                        setDraggingTaskId(task.id);
-                        event.dataTransfer.setData("text/plain", task.id);
-                        event.dataTransfer.effectAllowed = "move";
-                      }}
-                      onDragEnd={() => setDraggingTaskId(null)}
-                    >
-                      <TaskCard
-                        id={task.id}
-                        title={task.title}
-                        assignee={task.assignee}
-                        time={task.time}
-                        status={task.status}
-                        progress={task.progress}
-                        checklist={task.checklist}
-                        onToggleChecklist={updateChecklistItem}
-                        onAddChecklist={addChecklistItem}
-                        priority={task.priority}
-                        department={task.departmentName ?? task.department}
-                        onToggleComplete={(id, nextStatus) => {
-                          void updateTask(id, {
-                            status: nextStatus,
-                            progress: progressByStatus[nextStatus],
-                          });
+                {columnTasks.length ? (
+                  columnTasks.map((task) => {
+                    const canManage =
+                      !readOnly &&
+                      (currentUser?.role?.toLowerCase() === "admin" ||
+                        task.createdById === currentUser?.id);
+                    return (
+                      <div
+                        key={task.id}
+                        className="kanban-card-wrap"
+                        draggable={!task.locked && !readOnly}
+                        onDragStart={(event) => {
+                          setDraggingTaskId(task.id);
+                          event.dataTransfer.setData("text/plain", task.id);
+                          event.dataTransfer.effectAllowed = "move";
                         }}
-                        onUpdate={canManage ? updateTask : undefined}
-                        onDelete={canManage ? deleteTask : undefined}
-                      />
-                    </div>
-                  );
-                }) : <div className="kanban-empty">Chưa có công việc trong cột này</div>}
+                        onDragEnd={() => setDraggingTaskId(null)}
+                      >
+                        <TaskCard
+                          id={task.id}
+                          title={task.title}
+                          assignee={task.assignee}
+                          time={task.time}
+                          status={task.status}
+                          progress={task.progress}
+                          locked={task.locked || readOnly}
+                          extra={<TaskWorkflowPanel task={task} />}
+                          checklist={task.checklist}
+                          onToggleChecklist={
+                            task.locked || readOnly
+                              ? undefined
+                              : updateChecklistItem
+                          }
+                          onAddChecklist={
+                            task.locked || readOnly
+                              ? undefined
+                              : addChecklistItem
+                          }
+                          onReportFailure={
+                            !readOnly && task.assigneeId === currentUser?.id
+                              ? (taskId, itemId) => {
+                                  router.push(`/hospital-operations?taskId=${encodeURIComponent(taskId)}&itemId=${itemId}`);
+                                }
+                              : undefined
+                          }
+                          priority={task.priority}
+                          department={task.departmentName ?? task.department}
+                          onToggleComplete={(id, nextStatus) => {
+                            void updateTask(id, {
+                              status: nextStatus,
+                              progress: progressByStatus[nextStatus],
+                            });
+                          }}
+                          onUpdate={
+                            canManage && !task.locked ? updateTask : undefined
+                          }
+                          onDelete={canManage ? deleteTask : undefined}
+                        />
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="kanban-empty">
+                    Chưa có công việc trong cột này
+                  </div>
+                )}
               </div>
             </section>
           );

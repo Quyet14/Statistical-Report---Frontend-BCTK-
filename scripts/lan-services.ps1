@@ -39,7 +39,19 @@ if ($Action -eq 'stop') {
     Write-Output 'Managed Node/gateway services stopped. Redis data/volume retained.'
     exit 0
 }
-if (Test-Path -LiteralPath $statePath) { throw 'Managed state exists. Check status and stop before starting again.' }
+if (Test-Path -LiteralPath $statePath) {
+    $previousState = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
+    $processes = @(Get-CimInstance Win32_Process)
+    $ownedServices = @($previousState.services | Where-Object {
+        $record = $_
+        $processes | Where-Object { $_.ProcessId -eq $record.pid -and $_.CommandLine -like "*$runner*" }
+    })
+    $ownedGateway = @($processes | Where-Object { $_.ProcessId -eq $previousState.gatewayPid -and $_.ExecutablePath -eq $nginxExecutable })
+    if ($ownedServices.Count -or $ownedGateway.Count) { throw 'Managed services are still running. Check status before starting another instance.' }
+    $archive = Join-Path $runtimeDirectory ("services-stale-" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() + '.json')
+    Move-Item -LiteralPath $statePath -Destination $archive
+    Write-Output 'Archived stale process IDs; no running service was stopped.'
+}
 if (!(Test-Path -LiteralPath $nginxExecutable)) { throw 'Portable nginx 1.31.8 is required under deploy/.runtime/tools for this Windows LAN launcher.' }
 & $nodeExecutable (Join-Path $frontendRoot 'scripts/deployment-config.cjs') --check --generated "--out=$runtimeDirectory"
 if ($LASTEXITCODE -ne 0) { throw 'Configuration check failed.' }
@@ -48,7 +60,10 @@ if ($LASTEXITCODE -ne 0) { throw 'nginx config check failed.' }
 & docker compose -p careops-lan -f (Join-Path $runtimeDirectory 'redis.compose.yml') up -d
 if ($LASTEXITCODE -ne 0) { throw 'Redis could not start.' }
 $services = @()
-foreach ($service in @('backend', 'frontend')) {
+$serviceNames = @('backend', 'frontend')
+$backupConfiguration = Join-Path $runtimeDirectory 'backup.env'
+if ((Test-Path -LiteralPath $backupConfiguration) -and ((Get-Content -LiteralPath $backupConfiguration) -match '^BACKUP_AUTOMATION_ENABLED=true$')) { $serviceNames += 'backup' }
+foreach ($service in $serviceNames) {
     $arguments = @('"' + $runner + '"', $service, '"' + $runtimeDirectory + '"')
     $childProcess = Start-Process -FilePath $nodeExecutable -ArgumentList $arguments -WorkingDirectory $frontendRoot -WindowStyle Hidden -RedirectStandardOutput (Join-Path $runtimeDirectory "$service.out.log") -RedirectStandardError (Join-Path $runtimeDirectory "$service.err.log") -PassThru
     $services += @{ name = $service; pid = $childProcess.Id }

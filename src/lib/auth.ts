@@ -1,10 +1,17 @@
 import { requestJson, ApiRequestError } from "./http";
+import { discard as discardOfflineVault } from "./offline-vault";
 import { clearClientSession, saveUser, type CurrentUser } from "./session";
 import { startSessionActivity, endSessionActivity, sessionIsIdle, recordActivity } from "./session-activity";
 export { getStoredUser, saveUser, type CurrentUser } from "./session";
 export { ApiRequestError as AuthRequestError } from "./http";
-type AuthResponse = { message: string; email: string };
-export type VerifyLoginOtpResponse = { user: CurrentUser };
+type AuthResponse = {
+  message: string;
+  email: string;
+  requiresPasswordChange?: boolean;
+};
+export type VerifyLoginOtpResponse =
+  | { user: CurrentUser }
+  | { passwordChangeRequired: true; passwordChangeToken: string };
 export type LoginResponse = AuthResponse | { authenticated: true; user: CurrentUser };
 export type ForgotPasswordResponse = AuthResponse;
 export type ResetPasswordResponse = AuthResponse;
@@ -12,8 +19,9 @@ const post = <T>(path: string, body: unknown) => requestJson<T>(path, { method: 
 export const login = (email: string, password: string, captcha?: string, rememberDevice?: boolean) => post<LoginResponse>("/auth/login", { email: email.trim().toLowerCase(), password, ...(captcha !== undefined ? { captcha } : {}), ...(rememberDevice !== undefined ? { rememberDevice } : {}) });
 export function verifyLoginOtp(email: string, otp: string, rememberDevice?: boolean) {
   if (!/^\d{6}$/.test(otp)) return Promise.reject(new ApiRequestError("Mã OTP phải gồm đúng 6 chữ số.", 400));
-  return post<VerifyLoginOtpResponse>("/auth/verify-login-otp", { email: email.trim().toLowerCase(), otp, ...(rememberDevice !== undefined ? { rememberDevice } : {}) }).then(result => { startSessionActivity(); return result; });
+  return post<VerifyLoginOtpResponse>("/auth/verify-login-otp", { email: email.trim().toLowerCase(), otp, ...(rememberDevice !== undefined ? { rememberDevice } : {}) }).then(result => { if ("user" in result) startSessionActivity(); return result; });
 }
+export const completeInitialPasswordChange = (passwordChangeToken: string, newPassword: string) => post<{ message: string }>("/auth/initial-password-change", { passwordChangeToken, newPassword });
 export const forgotPassword = (email: string) => post<ForgotPasswordResponse>("/auth/forgot-password", { email: email.trim().toLowerCase() });
 export function resetPassword(email: string, otp: string, newPassword: string) {
   if (!/^\d{6}$/.test(otp)) return Promise.reject(new ApiRequestError("Mã OTP phải gồm đúng 6 chữ số.", 400));
@@ -28,11 +36,12 @@ export async function refreshCurrentUser(): Promise<CurrentUser> {
   return user;
 }
 export async function forgetDevice() {
-  await post("/auth/forget-device", {}); clearClientSession(); endSessionActivity();
+  await post("/auth/forget-device", {}); await discardOfflineVault().catch(() => undefined); clearClientSession(); endSessionActivity();
 }
 export async function clearTokens() {
   const response = await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: "{}" });
   if (!response.ok) throw new Error("Chưa thể đăng xuất. Vui lòng thử lại.");
+  await discardOfflineVault().catch(() => undefined);
   clearClientSession();
   endSessionActivity();
 }

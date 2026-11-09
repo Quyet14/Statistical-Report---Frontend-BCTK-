@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { AuthRequestError, refreshCurrentUser, login, saveUser, verifyLoginOtp, forgetDevice } from "@/lib/auth";
+import { AuthRequestError, refreshCurrentUser, login, saveUser, verifyLoginOtp, forgetDevice, completeInitialPasswordChange } from "@/lib/auth";
 import { useAuthCooldown } from "@/components/auth/useAuthCooldown";
 import { clearClientSession } from "@/lib/session";
 import { PasswordField } from "@/components/common/PasswordField";
@@ -25,7 +25,10 @@ export default function LoginPage() {
   const [captchaImage, setCaptchaImage] = useState("");
   const [captchaLoading, setCaptchaLoading] = useState(false);
   const captchaInFlight = useRef(false);
-  const [step, setStep] = useState<"login" | "otp">("login");
+  const [step, setStep] = useState<"login" | "otp" | "change-password">("login");
+  const [passwordChangeToken, setPasswordChangeToken] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmedPassword, setConfirmedPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -86,7 +89,9 @@ export default function LoginPage() {
       if ("authenticated" in result && result.authenticated) { saveUser(result.user); startSessionActivity(); window.location.replace("/checklist"); return; }
       if (!("email" in result)) throw new Error("Phản hồi đăng nhập không hợp lệ.");
       setEmail(result.email || normalizedEmail);
-      setMessage("Mã xác minh có hiệu lực trong 5 phút. Vui lòng kiểm tra hộp thư của bạn.");
+      setMessage("requiresPasswordChange" in result && result.requiresPasswordChange
+        ? "Tài khoản mới cần đổi mật khẩu. Nhập mã OTP gửi qua email để tiếp tục."
+        : "Mã xác minh có hiệu lực trong 5 phút. Vui lòng kiểm tra hộp thư của bạn.");
       setStep("otp");
       setPassword("");
     } catch (err) {
@@ -110,8 +115,17 @@ export default function LoginPage() {
 
     try {
       const result = await verifyLoginOtp(normalizedEmail, otp, rememberDevice);
-      saveUser(result.user);
-      window.location.replace("/checklist");
+      if ("passwordChangeRequired" in result && result.passwordChangeRequired) {
+        setPasswordChangeToken(result.passwordChangeToken);
+        setOtp("");
+        setStep("change-password");
+        setMessage("Xác minh thành công. Hãy đặt mật khẩu riêng trước khi sử dụng hệ thống.");
+      } else if ("user" in result) {
+        saveUser(result.user);
+        window.location.replace("/checklist");
+      } else {
+        throw new Error("Phản hồi xác minh không hợp lệ.");
+      }
     } catch (err) {
       cooldown.capture(err);
       setError(err instanceof Error ? err.message : "Xác minh OTP thất bại");
@@ -121,9 +135,39 @@ export default function LoginPage() {
     }
   };
 
+  const onChangeInitialPassword = async (event: FormEvent) => {
+    event.preventDefault();
+    if (verifyInFlightRef.current || cooldown.seconds > 0) return;
+    clearFeedback();
+    if (newPassword !== confirmedPassword) {
+      setError("Mật khẩu xác nhận không khớp.");
+      return;
+    }
+    verifyInFlightRef.current = true;
+    setIsLoading(true);
+    try {
+      const result = await completeInitialPasswordChange(passwordChangeToken, newPassword);
+      setPasswordChangeToken("");
+      setNewPassword("");
+      setConfirmedPassword("");
+      setPassword("");
+      setStep("login");
+      setMessage(result.message);
+    } catch (err) {
+      cooldown.capture(err);
+      setError(err instanceof Error ? err.message : "Không đổi được mật khẩu.");
+    } finally {
+      verifyInFlightRef.current = false;
+      setIsLoading(false);
+    }
+  };
+
   const returnToLogin = () => {
     clearFeedback();
     setOtp("");
+    setPasswordChangeToken("");
+    setNewPassword("");
+    setConfirmedPassword("");
     setStep("login");
     void loadCaptcha();
   };
@@ -147,11 +191,13 @@ export default function LoginPage() {
           <div className="auth-card-header">
             <Image className="auth-logo" src="/hospital-logo.png" alt="Logo bệnh viện" width={72} height={72} priority />
             <div className="auth-brand">HuuNghi CareOps</div>
-            <h1>{step === "login" ? "Chào mừng trở lại" : "Xác minh đăng nhập"}</h1>
+            <h1>{step === "login" ? "Chào mừng trở lại" : step === "otp" ? "Xác minh đăng nhập" : "Đổi mật khẩu lần đầu"}</h1>
             <p className="auth-card-subtitle">
               {step === "login"
                 ? "Đăng nhập để tiếp tục công việc của bạn."
-                : <>Nhập mã 6 chữ số đã gửi tới<br /><strong>{maskEmail(email)}</strong></>}
+                : step === "otp"
+                  ? <>Nhập mã 6 chữ số đã gửi tới<br /><strong>{maskEmail(email)}</strong></>
+                  : <>Tài khoản mới phải đặt mật khẩu riêng trước khi sử dụng.<br /><strong>{maskEmail(email)}</strong></>}
             </p>
           </div>
 
@@ -210,7 +256,7 @@ export default function LoginPage() {
                 {isLoading ? "Đang gửi mã..." : "Tiếp tục"}
               </button>
             </form>
-          ) : (
+          ) : step === "otp" ? (
             <form onSubmit={onVerifyOtp} className="auth-form">
               <div className="auth-label">Mã xác minh OTP</div>
               <OtpInput value={otp} onChange={setOtp} disabled={isLoading} />
@@ -222,6 +268,39 @@ export default function LoginPage() {
               </button>
               <button type="button" disabled={isLoading} className="auth-secondary" onClick={returnToLogin}>
                 Dùng email khác
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={onChangeInitialPassword} className="auth-form">
+              <label className="auth-label">
+                Mật khẩu mới
+                <PasswordField
+                  className="auth-input"
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  autoComplete="new-password"
+                  minLength={12}
+                  required
+                  placeholder="Ít nhất 12 ký tự"
+                />
+              </label>
+              <label className="auth-label">
+                Xác nhận mật khẩu mới
+                <PasswordField
+                  className="auth-input"
+                  value={confirmedPassword}
+                  onChange={(event) => setConfirmedPassword(event.target.value)}
+                  autoComplete="new-password"
+                  minLength={12}
+                  required
+                  placeholder="Nhập lại mật khẩu mới"
+                />
+              </label>
+              <button type="submit" disabled={isLoading || cooldown.seconds > 0 || !passwordChangeToken} className="auth-primary">
+                {isLoading ? "Đang cập nhật..." : "Đổi mật khẩu"}
+              </button>
+              <button type="button" disabled={isLoading} className="auth-secondary" onClick={returnToLogin}>
+                Quay lại đăng nhập
               </button>
             </form>
           )}

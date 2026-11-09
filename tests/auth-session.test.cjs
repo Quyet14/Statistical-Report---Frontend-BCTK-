@@ -49,6 +49,23 @@ test('OTP client rejects non-six-digit values without sending requests', async (
   const { auth } = session();
   for (const otp of ['12345', '1234567', 'abcdef']) await assert.rejects(auth.verifyLoginOtp('a@example.test', otp), error => error.status === 400);
 });
+test('initial password change uses the limited OTP challenge without an app session', async () => {
+  const { auth, state } = session();
+  state.fetch = async (url, options) => {
+    assert.equal(url, '/api/auth/initial-password-change');
+    assert.equal(options.method, 'POST');
+    assert.deepEqual(JSON.parse(options.body), {
+      passwordChangeToken: 'limited-password-change-token',
+      newPassword: 'a-private-password-with-12',
+    });
+    return Response.json({ message: 'updated' });
+  };
+  await auth.completeInitialPasswordChange(
+    'limited-password-change-token',
+    'a-private-password-with-12',
+  );
+  assert.equal(auth.getStoredUser(), null);
+});
 test('logout clears the server cookie before completing, without calling backend refresh', async () => {
   const { auth, state } = session(); auth.saveUser({ id: 2, role: 'staff' });
   state.fetch = async (url, options) => { assert.equal(url, '/api/auth/logout'); assert.equal(options.method, 'POST'); return Response.json({}); };

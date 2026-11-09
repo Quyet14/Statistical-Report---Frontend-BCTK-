@@ -1,0 +1,322 @@
+.hospital-operations-page .hospital-disabled,
+.hospital-form,
+.hospital-item {
+  padding: 22px;
+}
+
+.hospital-disabled p,
+.hospital-item p,
+.hospital-muted {
+  color: #647991;
+  line-height: 1.65;
+}
+
+.hospital-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.hospital-form,
+.hospital-list {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.hospital-form h4,
+.hospital-list h4 {
+  margin: 0;
+  color: #304f81;
+  font-size: 17px;
+}
+
+.hospital-form label {
+  display: grid;
+  gap: 7px;
+  color: #526784;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hospital-form input,
+.hospital-form select,
+.hospital-form textarea,
+.hospital-result select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid #d6e0ed;
+  border-radius: 9px;
+  color: #233d5b;
+  background: #fff;
+  font: inherit;
+}
+
+.hospital-form textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.hospital-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.hospital-warning {
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: 9px;
+  color: #80581a;
+  background: #fff5dc;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.hospital-item {
+  display: grid;
+  gap: 6px;
+  border-left: 3px solid #6c8bc3;
+}
+
+.hospital-item p {
+  margin: 4px 0;
+}
+
+.hospital-item-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #304f81;
+}
+
+.hospital-item code {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 7px 9px;
+  background: #f0f4f9;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+
+.task-checklist-item-wrap {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-checklist-failure {
+  flex: none;
+  border: 0;
+  border-radius: 7px;
+  padding: 5px 8px;
+  color: #a33b43;
+  background: #fff0ef;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.task-checklist-failed {
+  color: #b43c4e;
+  font-size: 12px;
+}
+
+.task-evidence {
+  margin-top: 12px;
+  border-top: 1px solid #e6edf5;
+  padding-top: 10px;
+  color: #405573;
+  font-size: 12px;
+}
+
+.task-evidence summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.task-evidence-content {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.task-evidence-content p {
+  margin: 0;
+  color: #68778c;
+}
+
+.task-evidence-error {
+  color: #a33b43 !important;
+}
+
+.task-evidence-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+
+.task-evidence-name {
+  flex: 1;
+}
+
+.task-evidence-row a,
+.task-evidence-row button,
+.task-evidence-preview-header button {
+  border: 0;
+  padding: 4px 7px;
+  color: #315d9a;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.task-evidence-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.task-evidence-upload-progress {
+  display: grid;
+  gap: 4px;
+}
+
+.task-evidence-upload-progress progress {
+  width: 100%;
+  accent-color: #315d9a;
+}
+
+.task-evidence-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(20 31 48 / 62%);
+}
+
+.task-evidence-preview {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  width: min(900px, 100%);
+  height: min(760px, 90vh);
+  padding: 16px;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.task-evidence-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+
+.task-evidence-preview iframe {
+  width: 100%;
+  height: 100%;
+  border: 1px solid #dce5ef;
+  border-radius: 8px;
+}
+
+.task-evidence-preview > p {
+  margin: 0;
+}
+
+.task-evidence-upload {
+  width: fit-content;
+  border: 1px solid #c9d6e8;
+  border-radius: 7px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.task-evidence-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.hospital-inspection {
+  display: grid;
+  gap: 11px;
+  margin-top: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #e6edf5;
+}
+
+.hospital-inspection h5 {
+  margin: 0;
+  color: #304f81;
+}
+
+.hospital-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px;
+  align-items: center;
+  gap: 12px;
+  color: #526784;
+  font-size: 14px;
+}
+
+.hospital-empty {
+  padding: 28px;
+  text-align: center;
+  color: #71849b;
+}
+
+.hospital-operations-page .workflow-state.in_progress,
+.hospital-operations-page .workflow-state.accepted {
+  background: #e7efff;
+  color: #315d9a;
+}
+
+.hospital-operations-page .workflow-state.completed,
+.hospital-operations-page .workflow-state.closed {
+  background: #dcf5ec;
+  color: #0e7e60;
+}
+
+.hospital-operations-page .workflow-state.rejected,
+.hospital-operations-page .workflow-state.cancelled {
+  background: #fff0ef;
+  color: #b43c4e;
+}
+
+.hospital-operations-page .workflow-state.open,
+.hospital-operations-page .workflow-state.pending {
+  background: #fff1ce;
+  color: #95620a;
+}
+
+@media (max-width: 900px) {
+  .hospital-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .hospital-form-row,
+  .hospital-result {
+    grid-template-columns: 1fr;
+  }
+
+  .hospital-item-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

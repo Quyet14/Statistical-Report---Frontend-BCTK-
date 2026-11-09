@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#0d7766" />
+    <title>Công việc ngoại tuyến | CareOps</title>
+    <link rel="stylesheet" href="/offline.css" />
+    <script type="module" src="/offline-app.js"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="eyebrow">CAREOPS · THIẾT BỊ CÁ NHÂN</span>
+        <h1>Công việc ngoại tuyến</h1>
+        <p id="network" role="status"></p>
+      </header>
+      <p class="notice">
+        Chỉ đánh dấu các mục checklist thông thường. Số liệu, chữ ký và phê
+        duyệt cần kết nối mạng. Thay đổi chỉ được ghi nhận trên máy chủ sau khi
+        đồng bộ thành công.
+      </p>
+      <p id="message" role="status" aria-live="polite"></p>
+      <form id="unlock">
+        <label for="phrase">Mật khẩu ngoại tuyến</label
+        ><input
+          id="phrase"
+          type="password"
+          autocomplete="off"
+          minlength="12"
+          maxlength="256"
+          required
+        /><button type="submit">Mở bản lưu trên thiết bị</button>
+      </form>
+      <section id="work" hidden>
+        <div class="toolbar">
+          <span id="summary"></span
+          ><button id="sync" type="button">Đồng bộ khi có mạng</button
+          ><button id="lock" type="button" class="secondary">
+            Khóa bản lưu
+          </button>
+        </div>
+        <div id="tasks"></div>
+      </section>
+      <footer>
+        <a href="/workflow/offline">Về CareOps / thiết lập bản mới</a
+        ><button id="discard" type="button" class="danger">
+          Xóa dữ liệu ngoại tuyến
+        </button>
+      </footer>
+      <dialog id="confirm">
+        <h2>Xóa bản lưu trên thiết bị?</h2>
+        <p>
+          Các thay đổi chưa đồng bộ sẽ mất. Dữ liệu trên máy chủ không bị thay
+          đổi.
+        </p>
+        <button id="cancel-discard" class="secondary">Giữ lại</button
+        ><button id="confirm-discard" class="danger">Xóa bản lưu</button>
+      </dialog>
+      <dialog id="conflict">
+        <h2>Kiểm tra thay đổi trên máy chủ</h2>
+        <p>
+          Không tự động ghi đè khi có xung đột. Các mục chỉ sửa trên máy chủ
+          được giữ nguyên.
+        </p>
+        <div id="comparison"></div>
+        <button id="keep-local">Áp dụng các dấu chọn của tôi vào bản mới</button
+        ><button id="use-server" class="secondary">
+          Dùng toàn bộ bản máy chủ</button
+        ><button id="close-conflict" class="secondary">Để sau</button>
+      </dialog>
+    </main>
+  </body>
+</html>

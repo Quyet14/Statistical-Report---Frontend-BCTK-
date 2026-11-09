@@ -4,7 +4,9 @@ import { contentSecurityPolicy } from "./lib/security-headers";
 
 export function proxy(request: NextRequest) {
   const nonce = randomBytes(24).toString("base64");
-  const csp = contentSecurityPolicy(nonce, process.env.NODE_ENV !== "production");
+  const csp = request.nextUrl.pathname === "/offline.html"
+    ? "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    : contentSecurityPolicy(nonce, process.env.NODE_ENV !== "production");
   const requestHeaders = new Headers(request.headers);
   // Never accept a browser-supplied nonce/CSP as the rendering policy.
   requestHeaders.set("x-nonce", nonce);
@@ -13,6 +15,8 @@ export function proxy(request: NextRequest) {
   const token = request.cookies.get("careops_session")?.value ?? "";
 
   const isProtectedRoute =
+    pathname.startsWith("/organization") ||
+    pathname.startsWith("/workflow") || pathname.startsWith("/notifications") ||
     pathname.startsWith("/archive") ||
     pathname.startsWith("/checklist") ||
     pathname.startsWith("/kpi") ||
@@ -23,8 +27,9 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/departments") ||
     pathname.startsWith("/personal-checklist") ||
     pathname.startsWith("/tasks");
+  const advancedProtectedRoute = pathname.startsWith("/programs");
 
-  if (isProtectedRoute && !token && !request.cookies.get("careops_refresh")?.value && !request.cookies.get("careops_device")?.value) {
+  if ((isProtectedRoute || advancedProtectedRoute) && !token && !request.cookies.get("careops_refresh")?.value && !request.cookies.get("careops_device")?.value) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

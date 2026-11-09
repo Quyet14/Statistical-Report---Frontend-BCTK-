@@ -41,3 +41,15 @@ test('department heads can open department details without administration routes
 test('all authenticated roles can open their own account page', () => {
   for (const role of ['admin', 'manager', 'staff']) assert.equal(canAccessRoute(role, '/account'), true);
 });
+
+test('all operational roles can open internal programs without exposing admin routes', () => {
+  for (const role of ['admin', 'manager', 'leader', 'staff', 'viewer']) {
+    assert.equal(canAccessRoute(role, '/programs'), true);
+  }
+  assert.equal(canAccessRoute('staff', '/programs/settings'), true);
+});
+
+test('KPI policy controls are limited to admins and department heads', () => {
+  for (const role of ['admin','manager']) assert.equal(canAccessRoute(role,'/kpi/policies'),true);
+  for (const role of ['leader','staff','viewer','unknown']) assert.equal(canAccessRoute(role,'/kpi/policies'),false);
+});

@@ -1,60 +1,31 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
-import { useTasks } from "@/context/TaskContext";
 import type { TaskItem } from "@/types";
+import { reportWorkbook } from "@/lib/report-xlsx";
+import { getStoredUser } from "@/lib/auth";
 import { SummaryCard } from "@/components/common/SummaryCard";
 import { CheckCircleOutlined, PieChartOutlined, ClockCircleOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
 
 const getLocalDate = () => {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${month}-${day}`;
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 };
 
 const getDateKey = (task: TaskItem) => (task.dueDate ?? task.time)?.slice(0, 10);
 
-const getPeriodBounds = (range: "day" | "week" | "month", selectedDate: string) => {
-  const baseDate = new Date(`${selectedDate}T00:00:00`);
-  if (Number.isNaN(baseDate.getTime())) {
-    const today = new Date();
-    return { start: today, end: today };
-  }
-
-  const start = new Date(baseDate);
-  const end = new Date(baseDate);
-
-  if (range === "week") {
-    start.setDate(baseDate.getDate() - baseDate.getDay());
-    end.setDate(start.getDate() + 6);
-  }
-
-  if (range === "month") {
-    start.setDate(1);
-    end.setMonth(start.getMonth() + 1, 0);
-  }
-
-  start.setHours(0, 0, 0, 0);
-  end.setHours(23, 59, 59, 999);
-  return { start, end };
-};
-
-const isTaskInPeriod = (task: TaskItem, start: Date, end: Date) => {
-  const dateKey = getDateKey(task);
-  if (!dateKey) return false;
-  const taskDate = new Date(`${dateKey}T00:00:00`);
-  return taskDate >= start && taskDate <= end;
-};
-
 const isLateTask = (task: TaskItem, todayKey = getLocalDate()) => {
   const dateKey = getDateKey(task);
-  return Boolean(dateKey && dateKey < todayKey && task.status !== "done");
+  return Boolean(dateKey && (task.status === "done" ? task.completedDay && task.completedDay > dateKey : dateKey < todayKey));
 };
 
 type ReportResponse = {
   data?: {
+    tasks?: (Omit<TaskItem, "id"> & { id: string | number })[];
+    comparison?: { completionRateDelta: number; previousTotal: number };
+    onTimeTasks?: number;
+    completionDateUnknown?: number;
     totalTasks?: number;
     completedTasks?: number;
     lateTasks?: number;
@@ -76,10 +47,16 @@ const getStoredReportDate = () => {
   return window.localStorage.getItem("reports-date") ?? getLocalDate();
 };
 
-const csvEscape = (value: string | number) => `"${String(value).replaceAll("\"", "\"\"")}"`;
-
 export default function ReportsPage() {
-  const { tasks } = useTasks();
+  const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
+  const [departmentId, setDepartmentId] = useState("");
+  const [departmentError, setDepartmentError] = useState("");
+  const [serverTasks, setServerTasks] = useState<TaskItem[] | null>(null);
+  const [reportError, setReportError] = useState("");
+  const [reportLoading, setReportLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [comparison, setComparison] = useState<{ completionRateDelta: number; previousTotal: number } | null>(null);
+  const [timeliness, setTimeliness] = useState<{ known: number; unknown: number } | null>(null);
   const [range, setRange] = useState<"day" | "week" | "month">(getStoredReportRange);
   const [selectedDate, setSelectedDate] = useState(getStoredReportDate);
   const [summary, setSummary] = useState({ totalTasks: 0, completedTasks: 0, lateTasks: 0, avgScore: 0 });
@@ -87,41 +64,28 @@ export default function ReportsPage() {
   const [taskList, setTaskList] = useState<{ name: string; status: string; delta: string }[]>([]);
   const [chartData, setChartData] = useState<{ label: string; value: number; done: number }[]>([]);
 
+  useEffect(() => { let cancelled = false; void api.get<{ id: number; name: string }[]>("/departments").then(value => { if (!cancelled) setDepartments(value); }).catch(() => { if (!cancelled) setDepartmentError("Không tải được danh sách khoa/phòng."); }); return () => { cancelled = true; }; }, []);
+
   useEffect(() => {
-    const loadReport = async () => {
-      try {
-        const json = await api.get<ReportResponse>(`/reports?period=${range}&date=${selectedDate}&scope=department`);
-        if (json && json.data) {
-          setSummary({
-            totalTasks: Number(json.data.totalTasks ?? 0),
-            completedTasks: Number(json.data.completedTasks ?? 0),
-            lateTasks: Number(json.data.lateTasks ?? 0),
-            avgScore: Number(json.data.avgScore ?? 0),
-          });
-
-          if (Array.isArray(json.data.categories)) {
-            setCategoryData(json.data.categories);
-          }
-          if (Array.isArray(json.data.highlights)) {
-            setTaskList(json.data.highlights);
-          }
-          setChartData(Array.isArray(json.data.chartData) ? json.data.chartData : []);
-        }
-      } catch (error) {
-        console.warn("Reports API unavailable.", error);
-      }
+    let cancelled = false; setReportLoading(true); setReportError(""); setServerTasks(null);
+    setSummary({ totalTasks: 0, completedTasks: 0, lateTasks: 0, avgScore: 0 }); setComparison(null); setTimeliness(null); setCategoryData([]); setTaskList([]); setChartData([]);
+    const load = async () => {
+      const params = new URLSearchParams({ period: range, date: selectedDate, scope: departmentId ? "department" : "company" });
+      if (departmentId) params.set("scopeId", departmentId);
+      const json = await api.get<ReportResponse>("/reports?" + params);
+      if (cancelled) return;
+      if (!json.data || !Array.isArray(json.data.tasks)) throw new Error("Máy chủ chưa trả đủ dữ liệu báo cáo.");
+      setSummary({ totalTasks: Number(json.data.totalTasks ?? 0), completedTasks: Number(json.data.completedTasks ?? 0), lateTasks: Number(json.data.lateTasks ?? 0), avgScore: Number(json.data.avgScore ?? 0) });
+      setServerTasks(Array.isArray(json.data.tasks) ? json.data.tasks.map(task => ({ ...task, id: String(task.id) })) : null);
+      setCategoryData(json.data.categories ?? []); setTaskList(json.data.highlights ?? []); setChartData(json.data.chartData ?? []); setComparison(json.data.comparison ?? null);
+      setTimeliness({ known: Number(json.data.onTimeTasks ?? 0), unknown: Number(json.data.completionDateUnknown ?? 0) });
     };
+    void load().catch(reason => { if (!cancelled) setReportError(reason instanceof Error ? reason.message : "Không tải được báo cáo."); }).finally(() => { if (!cancelled) setReportLoading(false); });
+    return () => { cancelled = true; };
+  }, [range, selectedDate, departmentId]);
 
-    void loadReport();
-  }, [range, selectedDate]);
-
-  const { reportTasks, departmentData, lateAlerts, computedSummary } = useMemo(() => {
-    const { start, end } = getPeriodBounds(range, selectedDate);
-    const scopedTasks = tasks.filter((task) => isTaskInPeriod(task, start, end));
-    const totalTasks = scopedTasks.length;
-    const completedTasks = scopedTasks.filter((task) => task.status === "done").length;
-    const lateTasks = scopedTasks.filter((task) => isLateTask(task)).length;
-    const avgScore = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const { reportTasks, departmentData, lateAlerts } = useMemo(() => {
+    const scopedTasks = serverTasks ?? [];
     const grouped = scopedTasks.reduce<Record<string, { total: number; done: number; late: number }>>((acc, task) => {
       const department = task.departmentName ?? task.department ?? "Chưa có phòng ban";
       acc[department] ??= { total: 0, done: 0, late: 0 };
@@ -146,49 +110,42 @@ export default function ReportsPage() {
       reportTasks: scopedTasks,
       departmentData: departmentRows,
       lateAlerts: lateRows,
-      computedSummary: { totalTasks, completedTasks, lateTasks, avgScore },
     };
-  }, [range, selectedDate, tasks]);
+  }, [serverTasks]);
 
-  const displaySummary = reportTasks.length > 0 ? computedSummary : summary;
+  const displaySummary = summary;
   const displayCategories = departmentData.length > 0 ? departmentData : categoryData.map((item) => ({ ...item, late: 0 }));
   const displayCompletionRate = Math.round(displaySummary.avgScore);
-  const onTimeRate = displaySummary.totalTasks > 0
-    ? Math.round(((displaySummary.totalTasks - displaySummary.lateTasks) / displaySummary.totalTasks) * 100)
-    : 0;
-  const exportRows = reportTasks.length > 0 ? reportTasks : tasks;
+  const exportRows = reportTasks;
 
-  const exportCsv = () => {
-    const header = ["Tên task", "Phòng ban", "Người phụ trách", "Trạng thái", "Tiến độ", "Hạn chót", "Ưu tiên"];
-    const rows = exportRows.map((task) => [
-      task.title,
-      task.departmentName ?? task.department ?? "Chưa có phòng ban",
-      task.assignee,
-      task.status === "done" ? "Hoàn thành" : task.status === "doing" ? "Đang làm" : "Chưa bắt đầu",
-      `${task.progress}%`,
-      getDateKey(task) ?? "",
-      task.priority,
-    ]);
-    const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
-    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `bao-cao-nhiem-vu-${range}-${selectedDate}.csv`;
-    link.click();
-    window.URL.revokeObjectURL(url);
+  const exportExcel = async () => {
+    if (exporting || reportLoading || reportError) return; setExporting(true);
+    try {
+      const logo = await fetch("/hospital-logo.png"); if (!logo.ok) throw new Error("Không tải được logo báo cáo.");
+      const rows: (string | number)[][] = [["STT", "Nội dung công việc", "Người phụ trách", "Khoa/phòng", "Hạn hoàn thành", "Trạng thái", "Tiến độ (%)"], ...exportRows.map((task, index) => [index + 1, task.title, task.assignee, task.departmentName ?? task.department ?? "", getDateKey(task) ?? "", task.status === "done" ? "Hoàn thành" : task.approvalState === "submitted" ? "Chờ duyệt" : task.status === "doing" ? "Đang làm" : "Chưa làm", task.progress])];
+      const bytes = reportWorkbook(rows, { title: "BÁO CÁO CÔNG VIỆC", period: range + " · " + selectedDate, author: getStoredUser()?.name ?? "", logo: new Uint8Array(await logo.arrayBuffer()) });
+      const url = URL.createObjectURL(new Blob([bytes.buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      const link = document.createElement("a"); link.href = url; link.download = "bao-cao-" + range + "-" + selectedDate + ".xlsx"; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (reason) { setReportError(reason instanceof Error ? reason.message : "Không xuất được báo cáo."); }
+    finally { setExporting(false); }
   };
 
   return (
     <div className="dashboard-page" data-page="reports">
+      <div className="report-print-header"><img src="/hospital-logo.png" alt="Logo bệnh viện" /><div><strong>BỆNH VIỆN HỮU NGHỊ</strong><h2>BÁO CÁO CÔNG VIỆC</h2><p>{selectedDate} · {range === "week" ? "Theo tuần" : range === "month" ? "Theo tháng" : "Theo ngày"}</p></div></div>
+      {reportError ? <p role="alert" className="workflow-alert">{reportError}</p> : null}
+      {departmentError ? <p role="alert" className="workflow-alert">{departmentError}</p> : null}
+      {reportLoading ? <p role="status">Đang tổng hợp báo cáo…</p> : null}
+      {comparison ? <p className="report-comparison">{comparison.previousTotal ? "So với kỳ trước: tỷ lệ hoàn thành " + (comparison.completionRateDelta > 0 ? "+" : "") + comparison.completionRateDelta + " điểm phần trăm." : "Kỳ trước chưa có dữ liệu để so sánh."}</p> : null}
       <div className="page-header">
         <div>
           <span className="eyebrow">Thông tin chi tiết</span>
           <h3 className="page-title">Báo cáo kết quả</h3>
-          <p className="page-description">Nhìn rõ bức tranh vận hành, nhận diện xu hướng và đưa ra quyết định kịp thời.</p>
         </div>
 
         <div className="toolbar">
+            {getStoredUser()?.role === "admin" ? <Link className="secondary-action" href="/reports/templates">Mẫu & lịch gửi</Link> : null}
+          <select className="soft-select" aria-label="Khoa/phòng báo cáo" value={departmentId} onChange={event => setDepartmentId(event.target.value)}><option value="">Toàn bệnh viện</option>{departments.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
           <div className="toggle-group" aria-label="Chọn thời gian báo cáo">
             <button type="button" className={range === "day" ? "toggle-btn active" : "toggle-btn"} onClick={() => { setRange("day"); window.localStorage.setItem("reports-range", "day"); }}>Theo ngày</button>
             <button
@@ -207,8 +164,8 @@ export default function ReportsPage() {
             </button>
           </div>
           <input className="date-input" type="date" value={selectedDate} onChange={(event) => { setSelectedDate(event.target.value); window.localStorage.setItem("reports-date", event.target.value); }} aria-label="Chọn thời gian báo cáo" />
-          <button type="button" className="secondary-action" onClick={exportCsv}>Xuất Excel</button>
-          <button type="button" className="secondary-action" onClick={() => window.print()}>Lưu PDF</button>
+          <button type="button" className="secondary-action" onClick={() => void exportExcel()} disabled={exporting || reportLoading || !!reportError}>Xuất Excel (.xlsx)</button>
+          <button type="button" className="secondary-action" disabled={reportLoading || !!reportError} onClick={() => window.print()}>In / Lưu PDF</button>
         </div>
       </div>
 
@@ -216,7 +173,7 @@ export default function ReportsPage() {
         <SummaryCard label="Đã hoàn thành" value={displaySummary.completedTasks} tone="green" icon={<CheckCircleOutlined />} />
         <SummaryCard label="Tỷ lệ hoàn thành" value={`${displayCompletionRate}%`} tone="blue" icon={<PieChartOutlined />} />
         <SummaryCard label="Chậm tiến độ" value={displaySummary.lateTasks} tone="amber" icon={<ClockCircleOutlined />} />
-        <SummaryCard label="Đúng tiến độ" value={`${onTimeRate}%`} tone="violet" icon={<SafetyCertificateOutlined />} />
+        <SummaryCard label="Hoàn thành đúng hạn" value={timeliness?.unknown ? "Chưa đủ dữ liệu" : `${displaySummary.completedTasks ? Math.round((timeliness?.known ?? 0) * 100 / displaySummary.completedTasks) : 0}%`} tone="violet" icon={<SafetyCertificateOutlined />} />
       </div>
 
       <div className="report-workspace">
@@ -298,6 +255,7 @@ export default function ReportsPage() {
         </div>
       </div>
       </div>
+      <div className="report-signatures"><div><strong>NGƯỜI LẬP BÁO CÁO</strong><p>{getStoredUser()?.name}</p></div><div><strong>NGƯỜI DUYỆT</strong><p>(Ký, ghi rõ họ tên)</p></div></div>
     </div>
   );
 }

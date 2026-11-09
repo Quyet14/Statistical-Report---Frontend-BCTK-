@@ -1,0 +1,114 @@
+.kpi-policy-explainer {
+  padding: 20px 24px;
+  margin-bottom: 18px;
+  border-left: 3px solid #6084c7;
+  color: #536e8d;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.kpi-policy-explainer strong {
+  color: #355988;
+}
+.kpi-policy-explainer p {
+  margin: 8px 0 0;
+}
+.kpi-policy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.kpi-policy-card {
+  padding: 22px;
+  min-width: 0;
+}
+.kpi-policy-card h4 {
+  font-size: 19px;
+  margin: 16px 0 8px;
+  color: #315784;
+}
+.kpi-policy-card p,
+.kpi-policy-card small {
+  font-size: 13px;
+  color: #70849d;
+}
+.kpi-policy-card dl > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-top: 1px solid #e9eef5;
+  padding: 12px 0;
+  font-size: 13px;
+}
+.kpi-policy-card dt {
+  color: #7b8ca2;
+}
+.kpi-policy-card dd {
+  margin: 0;
+  font-weight: 700;
+  color: #43648b;
+}
+.kpi-policy-fieldset {
+  border: 1px solid #dfe7f2;
+  border-radius: 12px;
+  padding: 14px;
+}
+.kpi-policy-fieldset legend {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 6px;
+  color: #57708e;
+}
+.kpi-policy-three {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.kpi-policy-error {
+  color: #ba4355;
+}
+.kpi-history-list {
+  display: grid;
+  gap: 12px;
+  max-height: 60vh;
+  overflow: auto;
+}
+.kpi-history-list article {
+  padding: 16px;
+  border: 1px solid #e0e8f3;
+  border-radius: 12px;
+  background: #f7faff;
+}
+.kpi-history-list strong {
+  display: block;
+  margin-bottom: 7px;
+  color: #355988;
+}
+.kpi-history-list p {
+  font-size: 13px;
+  color: #6f839d;
+  margin: 5px 0;
+}
+.kpi-table .table-title-button {
+  text-align: left;
+  background: none;
+  border: 0;
+  color: #315b99;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+.kpi-table small {
+  display: block;
+  font-size: 11px;
+  color: #8a789e;
+  margin-top: 5px;
+}
+@media (max-width: 600px) {
+  .kpi-policy-grid {
+    grid-template-columns: 1fr;
+  }
+  .kpi-policy-three {
+    grid-template-columns: 1fr;
+  }
+}

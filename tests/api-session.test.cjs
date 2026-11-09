@@ -12,7 +12,8 @@ function bridge(fetch, env = {}) {
       body = { ...body, captcha: 'AB2345' };
     }
     const url = `https://careops.example.test/api/${endpoint}`;
-    return route[method](new NextRequest(url, { method, headers: { ...(!omitOrigin ? { Origin: 'https://careops.example.test' } : {}), 'X-CareOps-Edge-Key': 'edge-secret-for-test-at-least-32-bytes', 'X-CareOps-Client-IP': '203.0.113.1', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(cookie ? { Cookie: cookie } : {}), ...headers }, body: body !== undefined ? JSON.stringify(body) : undefined }), { params: Promise.resolve({ path: endpoint.split('?')[0].split('/') }) });
+    const formData = typeof FormData !== 'undefined' && body instanceof FormData;
+    return route[method](new NextRequest(url, { method, headers: { ...(!omitOrigin ? { Origin: 'https://careops.example.test' } : {}), 'X-CareOps-Edge-Key': 'edge-secret-for-test-at-least-32-bytes', 'X-CareOps-Client-IP': '203.0.113.1', ...(body !== undefined && !formData ? { 'Content-Type': 'application/json' } : {}), ...(cookie ? { Cookie: cookie } : {}), ...headers }, body: body !== undefined ? (formData ? body : JSON.stringify(body)) : undefined }), { params: Promise.resolve({ path: endpoint.split('?')[0].split('/') }) });
   };
 }
 
@@ -41,6 +42,24 @@ test('OTP success keeps both tokens out of browser JSON and sets an HttpOnly ses
 test('protected calls forward only the HttpOnly session token and preserve query strings', async () => {
   const request = bridge(async (url, options) => { assert.equal(String(url), 'http://localhost:3010/api/kpi/ranking?period=month'); assert.equal(options.headers.Authorization, 'Bearer current-token'); return Response.json([]); });
   assert.equal((await request('kpi/ranking?period=month', { headers: { Authorization: 'Bearer attacker-controlled' } })).status, 200);
+});
+test('advanced operations API is allowlisted by the authenticated proxy', async () => {
+  const request = bridge(async url => {
+    assert.equal(String(url), 'http://localhost:3010/api/advanced-operations/capabilities');
+    return Response.json({ enabled: false });
+  });
+  const response = await request('advanced-operations/capabilities');
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { enabled: false });
+});
+test('hospital operations capabilities pass through the authenticated proxy when the feature is disabled', async () => {
+  const request = bridge(async url => {
+    assert.equal(String(url), 'http://localhost:3010/api/hospital-operations/capabilities');
+    return Response.json({ enabled: false });
+  });
+  const response = await request('hospital-operations/capabilities');
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { enabled: false });
 });
 test('missing session rejects protected calls without contacting the backend', async () => {
   const response = await bridge(() => { throw new Error('Must not forward'); })('users', { cookie: '' }); assert.equal(response.status, 401);
@@ -184,6 +203,65 @@ test('proxy rejects unsupported paths and oversized bodies before forwarding', a
   const request = bridge(() => { throw new Error('Must not forward'); });
   assert.equal((await request('unknown/users')).status, 404);
   assert.equal((await request('users', { method: 'POST', body: { name: 'x'.repeat(65536) } })).status, 413);
+});
+test('employee Excel import forwards bounded multipart bodies with their boundary', async () => {
+  const request = bridge(async (_url, options) => {
+    assert.match(options.headers['Content-Type'], /^multipart\/form-data;\s*boundary=/);
+    assert.ok(options.body.byteLength > 65536);
+    return Response.json({ totalRows: 1, valid: true });
+  });
+  const form = new FormData();
+  form.append('file', new Blob(['x'.repeat(70000)]), 'staff.xlsx');
+  const response = await request('users/import/preview', { method: 'POST', body: form });
+  assert.equal(response.status, 200);
+});
+test('multipart uploads remain restricted to employee import and within its upload cap', async () => {
+  let calls = 0;
+  const request = bridge(() => { calls++; return Response.json({}); });
+  const form = new FormData();
+  form.append('file', new Blob(['small']), 'staff.xlsx');
+  assert.equal((await request('users', { method: 'POST', body: form })).status, 415);
+  const oversized = new FormData();
+  oversized.append('file', new Blob(['x'.repeat(2 * 1024 * 1024 + 65537)]), 'staff.xlsx');
+  assert.equal((await request('users/import/preview', { method: 'POST', body: oversized })).status, 413);
+  assert.equal(calls, 0);
+});
+test('task evidence uploads and downloads preserve bounded binary content and safe response headers', async () => {
+  const upload = bridge(async (_url, options) => {
+    assert.match(options.headers['Content-Type'], /^multipart\/form-data;\s*boundary=/);
+    return Response.json({ id: 8 });
+  });
+  const form = new FormData();
+  form.append('file', new Blob(['jpeg data']), 'proof.jpg');
+  assert.equal((await upload('tasks/12/attachments', { method: 'POST', body: form })).status, 200);
+
+  const download = bridge(async () => new Response(new Uint8Array([0xff, 0xd8, 0xff]), {
+    headers: {
+      'Content-Type': 'image/jpeg',
+      'Content-Disposition': "attachment; filename*=UTF-8''proof.jpg",
+    },
+  }));
+  const response = await download('tasks/12/attachments/8/file');
+  assert.equal(response.headers.get('Content-Type'), 'image/jpeg');
+  assert.equal(response.headers.get('Content-Disposition'), "attachment; filename*=UTF-8''proof.jpg");
+  assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [0xff, 0xd8, 0xff]);
+});
+test('task evidence preview is inlined only for supported types and is not forwarded as an API query', async () => {
+  const request = bridge(async url => {
+    assert.equal(String(url), 'http://localhost:3010/api/tasks/12/attachments/8/file');
+    return new Response(new Uint8Array([0xff, 0xd8, 0xff]), {
+      headers: { 'Content-Type': 'image/jpeg', 'Content-Disposition': "attachment; filename*=UTF-8''proof.jpg" },
+    });
+  });
+  const preview = await request('tasks/12/attachments/8/file?preview=true');
+  assert.equal(preview.status, 200);
+  assert.equal(preview.headers.get('Content-Type'), 'image/jpeg');
+  assert.equal(preview.headers.get('Content-Disposition'), 'inline');
+
+  const unsupported = await bridge(async () => new Response('file', {
+    headers: { 'Content-Type': 'text/html', 'Content-Disposition': "attachment; filename*=UTF-8''proof.html" },
+  }))('tasks/12/attachments/8/file?preview=true');
+  assert.equal(unsupported.headers.get('Content-Disposition'), "attachment; filename*=UTF-8''proof.html");
 });
 test('backend URLs with or without api suffix work and remote production HTTP is rejected', async () => {
   for (const base of ['https://backend.example.test', 'https://backend.example.test/api/']) {

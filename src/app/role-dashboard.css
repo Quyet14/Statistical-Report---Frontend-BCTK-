@@ -1,0 +1,21 @@
+.role-dashboard { background:#f9fcff; border:1px solid #d9e7f3; border-radius:18px; padding:20px; margin-bottom:18px; box-shadow:0 7px 24px #172f5c12; color:#34516e; }
+.role-dashboard-top { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+.role-dashboard-eyebrow { font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:#357985; font-weight:800; }
+.role-dashboard h2 { font-size:clamp(17px,1.8vw,23px); margin:6px 0; color:#274e7a; letter-spacing:-.025em; }
+.role-dashboard p { margin:6px 0; color:#667e96; font-size:12px; }
+.role-dashboard-top>a { border:1px solid #d8e4ee; border-radius:10px; padding:10px 13px; background:white; font-size:12px; font-weight:700; color:#3769a4; }
+.role-dashboard-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:17px 0; }
+.role-dashboard-metrics>a { display:grid; gap:5px; background:linear-gradient(130deg,#eaf3ff,#f6fbff); border:1px solid #dce8f5; border-radius:13px; padding:13px; }
+.role-dashboard-metrics>a:nth-child(2) { background:linear-gradient(130deg,#fff2e7,#fffaf7); border-color:#f1e3d8; }
+.role-dashboard-metrics>a:nth-child(3) { background:linear-gradient(130deg,#e5f5ef,#f9fdfa); border-color:#d7ebe4; }
+.role-dashboard-metrics span { font-size:12px; font-weight:600; color:#536e88; }
+.role-dashboard-metrics strong { font-size:29px; line-height:1.3; color:#315fa3; }
+.role-dashboard-metrics small { font-size:10px; color:#65829f; }
+.role-dashboard-bottom { display:grid; grid-template-columns:1fr 1fr; gap:20px; border-top:1px solid #e1e9f0; padding-top:14px; font-size:12px; }
+.role-dashboard-trend { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:5px; margin-top:10px; }
+.role-dashboard-trend span { display:grid; gap:4px; justify-items:center; background:#edf3fc; border-radius:8px; padding:9px 4px; }
+.role-dashboard-trend b { font-size:17px; color:#416bac; }
+.role-dashboard-trend small { color:#6a8299; font-size:10px; }
+.role-workload-list { padding:0; list-style:none; margin:7px 0; }
+.role-workload-list li { display:flex; justify-content:space-between; gap:10px; border-bottom:1px solid #e5edf4; padding:5px 0; }
+@media(max-width:640px) { .role-dashboard { padding:14px; }.role-dashboard-metrics {gap:7px;}.role-dashboard-metrics>a {padding:10px 8px;}.role-dashboard-metrics strong {font-size:25px;}.role-dashboard-bottom {grid-template-columns:1fr;gap:14px;} }
