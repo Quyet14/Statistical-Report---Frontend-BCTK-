@@ -5,7 +5,7 @@ const { tsLoader } = require('./helpers/ts-loader.cjs');
 function bridge(fetch, env = {}) {
   const load = tsLoader({ fetch, process: { env: { NODE_ENV: 'test', API_BACKEND_URL: 'http://localhost:3010/api', FRONTEND_ORIGIN: 'https://careops.example.test', TRUSTED_EDGE_ENABLED: 'true', TRUSTED_EDGE_SECRET: 'edge-secret-for-test-at-least-32-bytes', BFF_PROXY_SECRET: 'bff-signing-secret-for-test-at-least-32-bytes', ...env } } });
   const route = load('src/app/api/[...path]/route.ts');
-  return (endpoint, { method = 'GET', body, headers = {}, cookie = 'careops_session=current-token', omitOrigin = false, captcha = true } = {}) => {
+  return async (endpoint, { method = 'GET', body, headers = {}, cookie = 'careops_session=current-token', omitOrigin = false, captcha = true } = {}) => {
     if (endpoint === 'auth/login' && captcha) {
       const token = load('src/lib/captcha.ts').captchaStore.issue('AB2345', '203.0.113.1');
       cookie += `; careops_captcha=${token}`;
@@ -13,7 +13,13 @@ function bridge(fetch, env = {}) {
     }
     const url = `https://careops.example.test/api/${endpoint}`;
     const formData = typeof FormData !== 'undefined' && body instanceof FormData;
-    return route[method](new NextRequest(url, { method, headers: { ...(!omitOrigin ? { Origin: 'https://careops.example.test' } : {}), 'X-CareOps-Edge-Key': 'edge-secret-for-test-at-least-32-bytes', 'X-CareOps-Client-IP': '203.0.113.1', ...(body !== undefined && !formData ? { 'Content-Type': 'application/json' } : {}), ...(cookie ? { Cookie: cookie } : {}), ...headers }, body: body !== undefined ? (formData ? body : JSON.stringify(body)) : undefined }), { params: Promise.resolve({ path: endpoint.split('?')[0].split('/') }) });
+    // The server receives encoded bytes, not a client-side FormData encoder.
+    // Finish that encoder first: cancelling its Blob stream mid-encoding can
+    // leave a late enqueue/rejection on some Node/Undici versions in CI.
+    const encoded = formData ? new Response(body) : undefined;
+    const requestBody = encoded ? await encoded.arrayBuffer() : body !== undefined ? JSON.stringify(body) : undefined;
+    const contentType = encoded?.headers.get('content-type') ?? 'application/json';
+    return route[method](new NextRequest(url, { method, headers: { ...(!omitOrigin ? { Origin: 'https://careops.example.test' } : {}), 'X-CareOps-Edge-Key': 'edge-secret-for-test-at-least-32-bytes', 'X-CareOps-Client-IP': '203.0.113.1', ...(body !== undefined ? { 'Content-Type': contentType } : {}), ...(cookie ? { Cookie: cookie } : {}), ...headers }, body: requestBody }), { params: Promise.resolve({ path: endpoint.split('?')[0].split('/') }) });
   };
 }
 
@@ -234,6 +240,27 @@ test('multipart uploads remain restricted to employee import and within its uplo
   oversized.append('file', new Blob(['x'.repeat(2 * 1024 * 1024 + 65537)]), 'staff.xlsx');
   assert.equal((await request('users/import/preview', { method: 'POST', body: oversized })).status, 413);
   assert.equal(calls, 0);
+});
+
+test('oversized multipart network stream is cancelled before forwarding or reading the rest', async () => {
+  let forwarded = 0, cancelled = false, bytesRead = 0;
+  const load = tsLoader({ fetch: () => { forwarded++; throw new Error('Must not forward'); }, process: { env: {
+    NODE_ENV: 'test', FRONTEND_ORIGIN: 'https://careops.example.test',
+  } } });
+  const route = load('src/app/api/[...path]/route.ts');
+  const stream = new ReadableStream({
+    pull(controller) { bytesRead += 65536; controller.enqueue(new Uint8Array(65536)); },
+    cancel() { cancelled = true; },
+  }, { highWaterMark: 0 });
+  const request = new NextRequest('https://careops.example.test/api/users/import/preview', {
+    method: 'POST', duplex: 'half', body: stream,
+    headers: { Origin: 'https://careops.example.test', Cookie: 'careops_session=current-token', 'Content-Type': 'multipart/form-data; boundary=network-upload' },
+  });
+  const response = await route.POST(request, { params: Promise.resolve({ path: ['users', 'import', 'preview'] }) });
+  assert.equal(response.status, 413);
+  assert.equal(cancelled, true);
+  assert.equal(bytesRead, 2 * 1024 * 1024 + 2 * 65536);
+  assert.equal(forwarded, 0);
 });
 test('task evidence uploads and downloads preserve bounded binary content and safe response headers', async () => {
   const upload = bridge(async (_url, options) => {
