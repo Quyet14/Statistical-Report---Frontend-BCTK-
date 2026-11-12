@@ -1,9 +1,24 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 
 export function InteractiveSurfaces({ children }: { children: ReactNode }) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    const root = rootRef.current;
+    const motion = window.matchMedia("(prefers-reduced-motion: no-preference)");
+    if (!root || !motion.matches) return;
+    const animation = root.animate(
+      [{ opacity: 0.35, transform: "translateY(14px)" }, { opacity: 1, transform: "translateY(0)" }],
+      { duration: 380, easing: "cubic-bezier(.2,.8,.2,1)" },
+    );
+    const stop = () => { if (!motion.matches) animation.cancel(); };
+    motion.addEventListener("change", stop);
+    return () => { animation.cancel(); motion.removeEventListener("change", stop); };
+  }, [pathname]);
 
   useEffect(() => {
     const root = rootRef.current;

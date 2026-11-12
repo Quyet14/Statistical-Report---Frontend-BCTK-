@@ -236,9 +236,6 @@ export default function ReportTemplates() {
         <div>
           <span className="eyebrow">BÁO CÁO THEO NHU CẦU</span>
           <h1 className="page-title">Mẫu báo cáo & lịch gửi</h1>
-          <p className="page-description">
-            Chọn cột, sắp xếp nội dung và theo dõi từng lần gửi báo cáo.
-          </p>
         </div>
         <Link className="secondary-action" href="/reports">
           Về báo cáo tổng hợp

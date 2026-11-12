@@ -4,10 +4,11 @@ import { TaskCard } from "@/components/checklist/TaskCard";
 import { TaskWorkflowPanel } from "@/components/checklist/TaskWorkflowPanel";
 import { RoleDashboard } from "@/components/checklist/RoleDashboard";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type DragEvent } from "react";
+import { useMemo, useState, type DragEvent } from "react";
 import { useTasks } from "@/context/TaskContext";
 import { getStoredUser, type CurrentUser } from "@/lib/auth";
 import type { TaskStatus } from "@/types";
+import { useLocale } from "@/i18n/locale-provider";
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -59,6 +60,7 @@ const getStoredChecklistFilter = () => {
 
 export default function ChecklistPage() {
   const router = useRouter();
+  const { locale, t } = useLocale();
   const {
     tasks,
     updateTask,
@@ -74,58 +76,52 @@ export default function ChecklistPage() {
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
 
   const selectedDate = getLocalDate();
-  const [weekStart, weekEnd] = getWeekBounds(new Date());
-  useEffect(() => {
-    if (tasks.length === 0 || filter === "all") return;
-
-    const hasTasksInFilter = tasks.some((task) => {
+  const [weekStart, weekEnd] = useMemo(
+    () => getWeekBounds(new Date(`${selectedDate}T00:00:00`)),
+    [selectedDate],
+  );
+  const { visibleTasks, tasksByStatus } = useMemo(() => {
+    const grouped: Record<TaskStatus, typeof tasks> = {
+      todo: [],
+      doing: [],
+      done: [],
+    };
+    const startOfWeek = new Date(weekStart.toDateString()).getTime();
+    const endOfWeek = new Date(weekEnd.toDateString()).getTime();
+    const visible = tasks.filter((task) => {
       const taskDate = dateKey(task.dueDate ?? task.time);
       if (!taskDate) return false;
-      if (filter === "today") return taskDate === selectedDate;
-      const date = new Date(`${taskDate}T00:00:00`);
-      return (
-        date >= new Date(weekStart.toDateString()) &&
-        date <= new Date(weekEnd.toDateString())
-      );
+      if (filter === "today" && taskDate !== selectedDate) return false;
+      if (filter === "week") {
+        const date = new Date(`${taskDate}T00:00:00`).getTime();
+        if (date < startOfWeek || date > endOfWeek) return false;
+      }
+      grouped[task.status].push(task);
+      return true;
     });
-    if (!hasTasksInFilter) {
-      window.localStorage.setItem("checklist-range", "all");
-      window.setTimeout(() => setFilter("all"), 0);
-    }
+    return { visibleTasks: visible, tasksByStatus: grouped };
   }, [filter, selectedDate, tasks, weekEnd, weekStart]);
-
-  const visibleTasks = tasks.filter((task) => {
-    const taskDate = dateKey(task.dueDate ?? task.time);
-    if (!taskDate) return false;
-    if (filter === "all") return true;
-    if (filter === "today") return taskDate === selectedDate;
-    const date = new Date(`${taskDate}T00:00:00`);
-    return (
-      date >= new Date(weekStart.toDateString()) &&
-      date <= new Date(weekEnd.toDateString())
-    );
-  });
   const summaryCards = [
     {
-      label: "Hoàn thành",
-      value: visibleTasks.filter((task) => task.status === "done").length,
+      label: t("checklist.completed"),
+      value: tasksByStatus.done.length,
       tone: "green",
       icon: CheckCircleOutlined,
-      hint: "Đã hoàn tất công việc",
+      hint: t("checklist.completedWork"),
     },
     {
-      label: "Đang làm",
-      value: visibleTasks.filter((task) => task.status === "doing").length,
+      label: t("checklist.inProgress"),
+      value: tasksByStatus.doing.length,
       tone: "blue",
       icon: PlayCircleOutlined,
-      hint: "Đang được triển khai",
+      hint: t("checklist.workInProgress"),
     },
     {
-      label: "Chưa bắt đầu",
-      value: visibleTasks.filter((task) => task.status === "todo").length,
+      label: t("checklist.notStarted"),
+      value: tasksByStatus.todo.length,
       tone: "red",
       icon: ClockCircleOutlined,
-      hint: "Sẵn sàng để bắt đầu",
+      hint: t("checklist.readyToStart"),
     },
   ];
   const completionRate = visibleTasks.length
@@ -149,8 +145,8 @@ export default function ChecklistPage() {
     <div className="dashboard-page" data-page="checklist">
       <div className="page-header">
         <div>
-          <span className="eyebrow">Tổng quan vận hành</span>
-          <h3 className="page-title">Việc cần làm hôm nay</h3>
+          <span className="eyebrow">{t("checklist.overview")}</span>
+          <h3 className="page-title">{t("checklist.todayTitle")}</h3>
         </div>
 
         <div className="toolbar">
@@ -162,11 +158,11 @@ export default function ChecklistPage() {
               setFilter(value);
               window.localStorage.setItem("checklist-range", value);
             }}
-            aria-label="Chọn khoảng thời gian"
+            aria-label={t("checklist.period")}
           >
-            <option value="today">Hôm nay</option>
-            <option value="week">Tuần này</option>
-            <option value="all">Tất cả công việc</option>
+            <option value="today">{t("checklist.today")}</option>
+            <option value="week">{t("checklist.thisWeek")}</option>
+            <option value="all">{t("checklist.allTasks")}</option>
           </select>
         </div>
       </div>
@@ -184,15 +180,15 @@ export default function ChecklistPage() {
       </div>} />
 
       <div className="board-heading" id="work-board">
-        <h3>Bảng công việc</h3>
+        <h3>{t("checklist.board")}</h3>
         <div className="board-summary">
           <span>
-            {visibleTasks.length} công việc · {completionRate}% hoàn thành
+            {visibleTasks.length} {locale === "en" ? "tasks" : "công việc"} · {completionRate}% {t("checklist.completed").toLowerCase()}
           </span>
           <div
             className="board-progress"
             role="progressbar"
-            aria-label="Tỷ lệ công việc hoàn thành"
+            aria-label={t("checklist.completedRate")}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={completionRate}
@@ -203,9 +199,7 @@ export default function ChecklistPage() {
       </div>
       <div className="kanban-board">
         {kanbanColumns.map((column) => {
-          const columnTasks = visibleTasks.filter(
-            (task) => task.status === column.status,
-          );
+          const columnTasks = tasksByStatus[column.status];
 
           return (
             <section
@@ -216,7 +210,7 @@ export default function ChecklistPage() {
             >
               <div className="kanban-column-header">
                 <div>
-                  <h4>{column.title}</h4>
+                  <h4>{column.status === "todo" ? t("checklist.todoColumn") : column.status === "doing" ? t("checklist.doingColumn") : t("checklist.doneColumn")}</h4>
                 </div>
                 <strong>{columnTasks.length}</strong>
               </div>
@@ -243,6 +237,7 @@ export default function ChecklistPage() {
                         <TaskCard
                           id={task.id}
                           title={task.title}
+                          titleEn={task.titleEn}
                           assignee={task.assignee}
                           time={task.time}
                           status={task.status}
@@ -285,7 +280,7 @@ export default function ChecklistPage() {
                   })
                 ) : (
                   <div className="kanban-empty">
-                    Chưa có công việc trong cột này
+                    {t("checklist.emptyColumn")}
                   </div>
                 )}
               </div>

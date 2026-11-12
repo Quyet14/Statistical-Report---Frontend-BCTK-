@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { SecurityProviders } from "@/components/layout/SecurityProviders";
+import type { UiLocale } from "@/i18n/locale-provider";
 import "antd/dist/reset.css";
 import "./globals.css";
 import "./premium.css";
@@ -17,6 +18,10 @@ import "./coordination.css";
 import "./collaboration.css";
 import "./role-dashboard.css";
 import "./workspace-polish.css";
+import "./locale.css";
+import "./visual-harmony.css";
+import "./interaction-polish.css";
+import "./glass-workspace.css";
 
 export const metadata: Metadata = {
   title: "Việc Pro | Hệ thống quản lý và Vận hành",
@@ -29,10 +34,14 @@ export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const nonce = (await headers()).get("x-nonce") ?? "";
+  const savedLocale = (await cookies()).get("locale")?.value;
+  const locale: UiLocale = savedLocale === "en" ? "en" : "vi";
   return (
-    <html lang="vi" className="h-full antialiased">
+    <html lang={locale} className="h-full antialiased">
       <body className="min-h-full flex flex-col">
-        <SecurityProviders nonce={nonce}>{children}</SecurityProviders>
+        <SecurityProviders nonce={nonce} initialLocale={locale}>
+          {children}
+        </SecurityProviders>
       </body>
     </html>
   );

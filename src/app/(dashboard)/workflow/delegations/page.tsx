@@ -115,10 +115,6 @@ export default function DelegationsPage() {
         <div>
           <span className="eyebrow">Có thời hạn · Có thể thu hồi</span>
           <h1 className="page-title">Ủy quyền duyệt</h1>
-          <p className="page-description">
-            Người nhận vẫn chỉ được thao tác trong phạm vi khoa/nhóm của mình.
-            Không được tự duyệt công việc được giao cho chính mình.
-          </p>
         </div>
         <Link className="secondary-action" href="/workflow">
           Về duyệt công việc

@@ -1,0 +1,53 @@
+.locale-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #35506f;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.locale-switcher select {
+  min-height: 36px;
+  max-width: 116px;
+  padding: 5px 8px;
+  color: #294361;
+  background: #fff;
+  border: 1px solid #cbd9ea;
+  border-radius: 9px;
+  font: inherit;
+}
+
+.locale-switcher select:focus-visible {
+  outline: 3px solid #5a8ee52b;
+  border-color: #5886d6;
+}
+
+.locale-switcher-error {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  width: max-content;
+  max-width: min(320px, 85vw);
+  padding: 8px 10px;
+  color: #8d2727;
+  background: #fff5f5;
+  border: 1px solid #f1c4c4;
+  border-radius: 8px;
+  white-space: normal;
+}
+
+.locale-switcher {
+  position: relative;
+}
+
+@media (max-width: 700px) {
+  .locale-switcher > span:first-child {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}

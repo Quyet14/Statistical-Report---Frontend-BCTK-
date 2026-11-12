@@ -11,9 +11,12 @@ import { api } from "@/lib/api";
 import { useTasks } from "@/context/TaskContext";
 import { BellOutlined, PlusOutlined } from "@ant-design/icons";
 import { WorkspaceSculpture } from "@/components/common/WorkspaceSculpture";
+import { LocaleSwitcher } from "./LocaleSwitcher";
+import { useLocale } from "@/i18n/locale-provider";
 
 const defaultForm = {
   title: "",
+  titleEn: "",
   assignee: "",
   assigneeId: 0,
   time: "",
@@ -21,6 +24,7 @@ const defaultForm = {
   priority: "Medium" as const,
   progress: 0,
   checklistText: "",
+  checklistTextEn: "",
   reviewerId: undefined as number | undefined,
 };
 
@@ -55,6 +59,7 @@ const addDays = (date: Date, days: number) => {
 
 export function AppHeader() {
   const pathname = usePathname();
+  const { t } = useLocale();
   const { notify } = useFeedback();
   const router = useRouter();
   const headerRef = useRef<HTMLElement>(null);
@@ -177,9 +182,20 @@ export function AppHeader() {
     }
 
     setIsCreatingTask(true);
+    const checklistLines = form.checklistText.split("\n");
+    const checklistLinesEn = form.checklistTextEn.split("\n");
+    const checklistTitles = checklistLines
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const checklistTitlesEn = checklistLines
+      .map((item, index) =>
+        item.trim() ? checklistLinesEn[index]?.trim() ?? "" : null,
+      )
+      .filter((item): item is string => item !== null);
     const saved = await addTask({
       ...form,
-      checklistTitles: form.checklistText.split("\n").map((item) => item.trim()).filter(Boolean),
+      checklistTitles,
+      checklistTitlesEn,
     });
     setIsCreatingTask(false);
     if (!saved) return;
@@ -189,12 +205,12 @@ export function AppHeader() {
 
   const handleLogout = async () => {
     try { await clearTokens(); window.location.replace("/login"); }
-    catch { notify({ kind: "error", title: "Chưa thể đăng xuất", description: "Vui lòng kiểm tra kết nối và thử lại." }); }
+    catch { notify({ kind: "error", title: t("header.logoutError"), description: t("header.retryConnection") }); }
   };
 
   return (
     <>
-      <header ref={headerRef} className={`workspace-masthead${isCompact ? " is-compact" : ""}${pathname === "/checklist" ? "" : " masthead-toolbar-only"}`} aria-label="Không gian làm việc Bệnh viện Hữu Nghị">
+      <header ref={headerRef} className={`workspace-masthead${isCompact ? " is-compact" : ""}${pathname === "/checklist" ? "" : " masthead-toolbar-only"}`} aria-label={t("header.workspace")}>
       <div className="topbar">
         <div className="topbar-title-group">
           <p className="topbar-title">BỆNH VIỆN HỮU NGHỊ</p>
@@ -202,11 +218,12 @@ export function AppHeader() {
         </div>
 
         <div className="topbar-actions">
+          <LocaleSwitcher />
           <GlobalSearch />
 
           {currentUser && ["admin","manager","leader"].includes(currentUser.role) ? (
             <button className="primary-action" type="button" onClick={() => setIsOpen(true)}>
-              <PlusOutlined aria-hidden="true" /> Giao việc
+              <PlusOutlined aria-hidden="true" /> {t("header.assign")}
             </button>
           ) : null}
 
@@ -214,7 +231,7 @@ export function AppHeader() {
             <button
               className="icon-button"
               type="button"
-              aria-label="Thông báo"
+              aria-label={t("header.notifications")}
               aria-expanded={isNotificationsOpen}
               onClick={() => setIsNotificationsOpen((current) => !current)}
             >
@@ -222,10 +239,10 @@ export function AppHeader() {
             </button>
 
             {isNotificationsOpen ? (
-              <div className="notification-panel" role="menu" aria-label="Bảng thông báo">
+              <div className="notification-panel" role="menu" aria-label={t("header.notificationPanel")}>
                 <div className="notification-panel-header">
-                  <strong>Thông báo vận hành</strong>
-                  <span>{displayNotifications.length} cập nhật</span>
+                  <strong>{t("header.operationsNotifications")}</strong>
+                  <span>{displayNotifications.length} {t("header.updates")}</span>
                 </div>
                 {displayNotifications.length ? displayNotifications.map((item) => (
                   <button
@@ -244,10 +261,10 @@ export function AppHeader() {
                       setIsNotificationsOpen(false);
                     }}
                   >
-                    <strong>{item.title}</strong>
-                    <span>{item.message}</span>
+                    <strong data-i18n-skip>{item.title}</strong>
+                    <span data-i18n-skip>{item.message}</span>
                   </button>
-                )) : <div className="notification-empty">Chưa có cập nhật mới về nhiệm vụ</div>}
+                )) : <div className="notification-empty">{t("header.emptyNotifications")}</div>}
               </div>
             ) : null}
           </div>
@@ -260,16 +277,16 @@ export function AppHeader() {
               onClick={() => setIsUserMenuOpen((current) => !current)}
             >
               <span className="user-badge">{currentUser?.name?.trim().split(/\s+/).slice(-1)[0]?.[0]?.toUpperCase() ?? "U"}</span>
-              <span>{currentUser?.name ?? "Người dùng"}</span>
+              <span data-i18n-skip>{currentUser?.name ?? "Người dùng"}</span>
             </button>
 
             {isUserMenuOpen ? (
               <div className="user-menu-panel" role="menu">
                 <button type="button" role="menuitem" onClick={() => { setIsUserMenuOpen(false); router.push("/account"); }}>
-                  Hồ sơ tài khoản
+                  {t("header.account")}
                 </button>
                 <button type="button" role="menuitem" onClick={handleLogout}>
-                  Đăng xuất
+                  {t("header.logout")}
                 </button>
               </div>
             ) : null}
@@ -281,7 +298,7 @@ export function AppHeader() {
       {pathname === "/checklist" ? <div className="workspace-banner">
         <section className="workspace-hero" aria-labelledby="workspace-welcome">
           <div className="workspace-hero-copy">
-            <h2 id="workspace-welcome"><span>Một ngày hiệu quả.</span><em>Cùng nhau tạo khác biệt.</em></h2>
+            <h2 id="workspace-welcome"><span>{t("header.welcome")}</span><em>{t("header.welcomeSub")}</em></h2>
           </div>
           <div className="masthead-art"><WorkspaceGalaxy /><WorkspaceSculpture /></div>
         </section>
@@ -289,29 +306,30 @@ export function AppHeader() {
 
       {isOpen ? (
         <div className="modal-backdrop" onClick={() => setIsOpen(false)}>
-          <div className="task-modal" onClick={(event) => event.stopPropagation()}>
+          <div className="task-modal" role="dialog" aria-modal="true" aria-labelledby="task-assignment-title" onClick={(event) => event.stopPropagation()}>
             <div className="task-modal-header">
-              <h3>Giao việc mới</h3>
+              <h3 id="task-assignment-title">{t("task.new")}</h3>
               <button type="button" className="close-button" onClick={() => setIsOpen(false)}>
                 ×
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="task-form">
+              <div className="task-form-fields">
               <label>
-                Nội dung công việc
+                {t("task.title")}
                 <input
                   name="title"
                   value={form.title}
                   onChange={handleChange}
-                  placeholder="Nhập nội dung công việc"
+                  placeholder={t("task.titlePlaceholder")}
                   required
                 />
               </label>
 
               <div className="task-form-row">
                 <label>
-                  Người phụ trách
+                  {t("task.assignee")}
                   <select
                     name="assigneeId"
                     value={form.assigneeId || ""}
@@ -321,13 +339,13 @@ export function AppHeader() {
                     }}
                     required
                   >
-                    <option value="">Chọn người dùng</option>
+                    <option value="">{t("task.chooseUser")}</option>
                     {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
                   </select>
                 </label>
 
                 <label>
-                  Thời gian
+                  {t("task.time")}
                   <input
                     name="time"
                     type="date"
@@ -338,29 +356,29 @@ export function AppHeader() {
                 </label>
               </div>
 
-              <label>Người duyệt<select value={form.reviewerId ?? ""} onChange={event => setForm(current => ({ ...current, reviewerId: Number(event.target.value) || undefined }))}><option value="">Không yêu cầu duyệt</option>{reviewers.filter(person => person.id !== form.assigneeId && (person.role === "admin" || (person.departmentId != null && person.departmentId === users.find(item => item.id === form.assigneeId)?.departmentId))).map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select><small>Việc cần duyệt chỉ được tính hoàn thành sau khi người duyệt xác nhận.</small></label>
+              <label>{t("task.reviewer")}<select value={form.reviewerId ?? ""} onChange={event => setForm(current => ({ ...current, reviewerId: Number(event.target.value) || undefined }))}><option value="">{t("task.noReview")}</option>{reviewers.filter(person => person.id !== form.assigneeId && (person.role === "admin" || (person.departmentId != null && person.departmentId === users.find(item => item.id === form.assigneeId)?.departmentId))).map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select><small>{t("task.reviewHelp")}</small></label>
               <div className="task-form-row">
                 <label>
-                  Trạng thái
+                  {t("task.status")}
                   <select name="status" value={form.status} onChange={handleChange} disabled>
-                    <option value="todo">Chưa bắt đầu</option>
-                    <option value="doing">Đang làm</option>
-                    <option value="done">Hoàn thành</option>
+                    <option value="todo">{t("task.todo")}</option>
+                    <option value="doing">{t("task.doing")}</option>
+                    <option value="done">{t("task.done")}</option>
                   </select>
                 </label>
 
                 <label>
-                  Mức độ ưu tiên
+                  {t("task.priority")}
                   <select name="priority" value={form.priority} onChange={handleChange}>
-                    <option value="Low">Thấp</option>
-                    <option value="Medium">Trung bình</option>
-                    <option value="High">Cao</option>
+                    <option value="Low">{t("task.low")}</option>
+                    <option value="Medium">{t("task.medium")}</option>
+                    <option value="High">{t("task.high")}</option>
                   </select>
                 </label>
               </div>
 
               <label>
-                Tiến độ
+                {t("task.progress")}
                 <input
                   name="progress"
                   disabled
@@ -374,22 +392,23 @@ export function AppHeader() {
               </label>
 
               <label>
-                Checklist công việc
+                {t("task.checklist")}
                 <textarea
                   name="checklistText"
                   value={form.checklistText}
                   onChange={handleChange}
-                  placeholder={"Mỗi dòng là một công việc\nVí dụ: Kiểm tra tài liệu\nGửi báo cáo cho trưởng phòng"}
+                  placeholder={t("task.checklistPlaceholder")}
                   rows={4}
                 />
               </label>
 
+              </div>
               <div className="task-modal-actions">
                 <button type="button" className="secondary-action" onClick={() => setIsOpen(false)}>
-                  Hủy
+                  {t("task.cancel")}
                 </button>
                 <button type="submit" className="primary-action" disabled={isCreatingTask}>
-                  {isCreatingTask ? "Đang lưu..." : "Giao việc"}
+                  {isCreatingTask ? t("task.saving") : t("header.assign")}
                 </button>
               </div>
             </form>

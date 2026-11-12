@@ -12,9 +12,10 @@ const refreshes = new Map(); let rotation = 0;
 let remembered = null;
 let administrator = false;
 let director = false;
+let employee = false;
 let kpiPolicies = [], kpiPositions = {}, kpiFrozen = false;
 let workTasks = [], workTemplates = [], workAudit = [];
-const viewer = () => director ? { ...user, id: 7, role: 'viewer', name: 'Director fixture', departmentId: null } : administrator ? { ...user, id: 1, role: 'admin', name: 'Admin fixture', departmentId: null } : user;
+const viewer = () => employee ? staff : director ? { ...user, id: 7, role: 'viewer', name: 'Director fixture', departmentId: null } : administrator ? { ...user, id: 1, role: 'admin', name: 'Admin fixture', departmentId: null } : user;
 // Isolate per-client CAPTCHA issuance limits between browser cases without a product bypass.
 let fixtureClient = 1;
 function deviceTokens() { const value = 'fixture-device-' + (++rotation); remembered.tokens.add(value); return { deviceToken: value, deviceExpiresAt: remembered.expires }; }
@@ -36,7 +37,8 @@ function validProof(req) {
 const backend = http.createServer(async (req, res) => {
   const route = new URL(req.url, 'http://localhost').pathname;
   if (route.startsWith('/__test/')) {
-    if (route === '/__test/reset') { expired = false; forbidden = false; refreshes.clear(); remembered = null; administrator = false; director = false; kpiPolicies = []; kpiPositions = {}; kpiFrozen = false; workTasks = []; workTemplates = []; workAudit = []; fixtureClient = fixtureClient % 240 + 1; }
+    if (route === '/__test/reset') { expired = false; forbidden = false; refreshes.clear(); remembered = null; administrator = false; director = false; employee = false; kpiPolicies = []; kpiPositions = {}; kpiFrozen = false; workTasks = []; workTemplates = []; workAudit = []; fixtureClient = fixtureClient % 240 + 1; }
+    else if (route === '/__test/staff-role') employee = true;
     else if (route === '/__test/director') director = true;
     else if (route === '/__test/admin') administrator = true;
     else if (route === '/__test/edit') workTasks = [{ id: 902, title: 'Công việc cập nhật tiến độ', assignee: staff.name, assigneeId: 3, createdById: 2, departmentId: 10, departmentName: 'Khoa thử nghiệm', status: 'doing', progress: 50, priority: 'medium', dueDate: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date()), isRecurring: true, checklist: [] }];

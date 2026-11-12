@@ -7,6 +7,7 @@ import { TaskProvider } from "@/context/TaskContext";
 import { InteractiveSurfaces } from "@/components/layout/InteractiveSurfaces";
 import { FeedbackProvider } from "@/context/FeedbackContext";
 import { GalaxyBackdrop } from "@/components/layout/GalaxyBackdrop";
+import { PullToRefresh } from "@/components/layout/PullToRefresh";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
@@ -18,14 +19,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <GalaxyBackdrop />
             <AppSidebar />
 
-            <div className="dashboard-main">
+            <PullToRefresh>
               <main className="dashboard-content">
                 <div className="page-shell">
                   <AppHeader />
                   <InteractiveSurfaces>{children}</InteractiveSurfaces>
                 </div>
               </main>
-            </div>
+            </PullToRefresh>
           </div>
         </TaskProvider>
         </FeedbackProvider>

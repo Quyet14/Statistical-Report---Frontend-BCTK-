@@ -61,6 +61,15 @@ test('hospital operations capabilities pass through the authenticated proxy when
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { enabled: false });
 });
+test('UI translation dictionary is available through the authenticated proxy', async () => {
+  const request = bridge(async url => {
+    assert.equal(String(url), 'http://localhost:3010/api/i18n/en');
+    return Response.json({ 'nav.today': 'Today' });
+  });
+  const response = await request('i18n/en');
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { 'nav.today': 'Today' });
+});
 test('missing session rejects protected calls without contacting the backend', async () => {
   const response = await bridge(() => { throw new Error('Must not forward'); })('users', { cookie: '' }); assert.equal(response.status, 401);
 });

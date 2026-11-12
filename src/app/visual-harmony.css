@@ -1,0 +1,338 @@
+:root {
+  --visual-ink: #193653;
+  --visual-muted: #526b82;
+  --visual-line: #cbdceb;
+  --visual-surface: rgba(248, 251, 255, 0.97);
+  --visual-surface-raised: rgba(255, 255, 255, 0.985);
+  --visual-accent: #167f83;
+  --visual-accent-soft: #e6f4f3;
+}
+
+body {
+  background:
+    radial-gradient(ellipse at 12% 8%, #d7ecf055, transparent 34rem),
+    radial-gradient(ellipse at 92% 88%, #cbdcf544, transparent 38rem),
+    #edf3f8;
+  color: var(--visual-ink);
+}
+
+.auth-page {
+  background:
+    radial-gradient(ellipse at 100% 100%, #d6e8f055, transparent 45%),
+    #edf3f8;
+}
+
+.auth-aside {
+  background:
+    radial-gradient(ellipse at 76% 88%, #21877f44, transparent 48%),
+    radial-gradient(ellipse at 10% 12%, #274a78aa, transparent 55%),
+    linear-gradient(145deg, #0b1b32, #103452 62%, #124b50);
+}
+
+.auth-panel {
+  background:
+    radial-gradient(ellipse at 100% 0, #d7ebf366, transparent 58%),
+    linear-gradient(145deg, #f3f7fb, #eaf1f7);
+}
+
+.auth-card {
+  background: var(--visual-surface-raised);
+  border-color: #ffffff;
+  box-shadow:
+    0 2px 6px #17365308,
+    0 24px 64px -28px #17365335;
+}
+
+.auth-card h1 {
+  color: var(--visual-ink);
+}
+
+.auth-input {
+  color: var(--visual-ink);
+  background: #fbfdff;
+  border-color: var(--visual-line);
+}
+
+.auth-input:focus {
+  border-color: var(--visual-accent);
+  box-shadow: 0 0 0 4px #167f831c;
+}
+
+.captcha-preview {
+  border-color: #b7d4d2;
+  background:
+    repeating-linear-gradient(
+      -8deg,
+      transparent 0,
+      transparent 10px,
+      #d8e9e84d 11px,
+      #d8e9e84d 12px
+    ),
+    #f4faf9;
+}
+
+.captcha-row .captcha-answer {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.dashboard-shell {
+  background: transparent;
+}
+
+.dashboard-shell .sidebar-panel,
+.dashboard-shell .topbar {
+  background-color: rgba(246, 250, 255, 0.96);
+  border-color: #cbdceb;
+  backdrop-filter: blur(14px) saturate(125%);
+}
+
+.dashboard-shell .sidebar-brand-row,
+.dashboard-shell .sidebar-usercard {
+  background-color: rgba(255, 255, 255, 0.86);
+  border-color: #d3e1ee;
+}
+
+.dashboard-shell .dashboard-surfaces .dashboard-page > .page-header {
+  min-height: 0;
+  margin-bottom: 12px;
+  padding: 2px 2px 10px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #cbdceb99;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.dashboard-shell .dashboard-surfaces .dashboard-page > .page-header > div:first-child {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.dashboard-shell .dashboard-surfaces .dashboard-page > .page-header :is(.eyebrow, .section-eyebrow) {
+  display: none;
+}
+
+.dashboard-shell .dashboard-surfaces .dashboard-page > .page-header .page-title {
+  position: relative;
+  color: #153653;
+  font-weight: 800;
+  padding-left: 14px;
+}
+
+.dashboard-shell .dashboard-surfaces .dashboard-page > .page-header .page-title::before {
+  position: absolute;
+  top: 0.18em;
+  bottom: 0.18em;
+  left: 0;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #15968b, #176b9b);
+  content: "";
+}
+
+.dashboard-shell .dashboard-surfaces .dashboard-page > .page-header p {
+  color: #4a6078;
+}
+
+.dashboard-shell:has(.galaxy-backdrop:not(.galaxy-off)) .dashboard-surfaces .dashboard-page > .page-header {
+  border-bottom-color: #d6e8ff45;
+}
+
+.dashboard-shell:has(.galaxy-backdrop:not(.galaxy-off)) .dashboard-surfaces .dashboard-page > .page-header .page-title {
+  color: #f4f9ff;
+  text-shadow: 0 1px 8px #06142680;
+}
+
+.dashboard-shell .dashboard-surfaces :is(.surface-card, .panel-card, .stat-card, .task-card) {
+  color: var(--visual-ink);
+  background-color: var(--visual-surface);
+  border-color: #ccdae8;
+  box-shadow:
+    inset 0 1px #ffffff,
+    0 6px 20px #102e4c12;
+}
+
+.dashboard-shell .dashboard-surfaces :is(.workflow-tabs, .hospital-tabs) {
+  background: rgba(233, 241, 250, 0.94);
+  border-color: #cbdceb;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .board-heading h3 {
+  color: #eef7ff;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .board-summary {
+  color: #e2efff;
+  background: rgba(12, 35, 60, 0.78);
+  border: 1px solid #8db4d54d;
+  border-radius: 12px;
+  padding: 7px 10px;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .board-summary > span {
+  color: #d3e4f6;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .board-progress {
+  background: #d7e5f033;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .kanban-column {
+  background: rgba(12, 34, 59, 0.68);
+  border-color: #9dc2df52;
+  box-shadow:
+    inset 0 1px #e8f5ff12,
+    0 12px 30px #030e2433;
+  backdrop-filter: blur(12px) saturate(120%);
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .kanban-column.status-todo {
+  --column-accent: #8eb6e8;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .kanban-column.status-doing {
+  --column-accent: #65c5dc;
+  background: rgba(13, 43, 69, 0.72);
+  border-color: #65c5dc70;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .kanban-column.status-done {
+  --column-accent: #73cfad;
+  background: rgba(12, 49, 54, 0.7);
+  border-color: #73cfad68;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .kanban-column-header {
+  border-bottom-color: #c3def52e;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .kanban-column-header h4,
+.dashboard-shell .dashboard-page[data-page="checklist"] .kanban-column-header span {
+  color: #e5f0fb;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .kanban-column-header strong {
+  color: #f0f7ff;
+  background: #dceeff18;
+  border-color: #c6e2fa38;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .kanban-empty {
+  color: #d3e3f2;
+  background: #dceeff0a;
+  border-color: #bdd9f04d;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .kanban-card-wrap .task-card {
+  background: linear-gradient(145deg, rgba(250, 253, 255, 0.98), rgba(235, 244, 252, 0.97));
+  border-color: #b7cde0;
+  box-shadow:
+    inset 0 1px #ffffff,
+    0 7px 18px #020e2526;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .task-status-todo {
+  border-top: 3px solid #91b6e4;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .task-status-doing {
+  border-top: 3px solid #55b9d1;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .task-status-done {
+  border-top: 3px solid #62b99a;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .task-card-header .task-title {
+  color: #203f5d;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .task-checklist {
+  background: linear-gradient(135deg, #edf4fa, #f3f8fb);
+  border-color: #d2e0eb;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .task-checklist-item {
+  color: #314f69;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .task-dependencies,
+.dashboard-shell .dashboard-page[data-page="checklist"] .task-coordination,
+.dashboard-shell .dashboard-page[data-page="checklist"] .task-collaboration {
+  box-shadow: inset 0 1px #ffffffc7;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .task-dependencies {
+  background: #edf4fa;
+  border-color: #d0dfeb;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .task-coordination {
+  background: #edf6f4;
+  border-color: #cce2dc;
+}
+
+.dashboard-shell .dashboard-page[data-page="checklist"] .task-collaboration {
+  background: #f0f2fa;
+  border-color: #d5dced;
+}
+
+.dashboard-shell .dashboard-surfaces :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea, .input-field) {
+  color: #213f5b;
+  background-color: #fbfdff;
+  border-color: #bfcfdf;
+}
+
+.dashboard-shell .dashboard-surfaces :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, .input-field)::placeholder {
+  color: #687f94;
+}
+
+.dashboard-shell .dashboard-surfaces :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea, .input-field):focus-visible {
+  border-color: var(--visual-accent);
+  outline-color: #167f832b;
+}
+
+.dashboard-shell .galaxy-control {
+  color: #eff8ff;
+  background: rgba(10, 34, 57, 0.94);
+  border-color: #a7d6e766;
+  box-shadow: 0 5px 18px #07162955;
+}
+
+.dashboard-shell .galaxy-control:hover {
+  background: #164863;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .dashboard-shell .sidebar-panel,
+  .dashboard-shell .topbar,
+  .dashboard-shell .dashboard-surfaces .page-header {
+    backdrop-filter: none;
+    background: linear-gradient(110deg, #ffffff, #f8fafc);
+  }
+}
+
+@media (max-width: 700px) {
+  .dashboard-shell .dashboard-surfaces .dashboard-page > .page-header {
+    align-items: flex-start;
+  }
+
+  .dashboard-shell .dashboard-surfaces .dashboard-page > .page-header .page-title {
+    font-size: clamp(20px, 5vw, 24px);
+  }
+}
+
+@media print {
+  body,
+  .auth-page,
+  .dashboard-shell,
+  .dashboard-shell .dashboard-surfaces :is(.surface-card, .panel-card, .stat-card, .task-card) {
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+}

@@ -14,10 +14,12 @@ import { TaskEvidencePanel } from "./TaskEvidencePanel";
 import { TaskDependenciesPanel } from "./TaskDependenciesPanel";
 import { TaskCoordinationPanel } from "./TaskCoordinationPanel";
 import { TaskCollaborationPanel } from "./TaskCollaborationPanel";
+import { useLocale } from "@/i18n/locale-provider";
 
 type TaskCardProps = {
   id: string;
   title: string;
+  titleEn?: string | null;
   assignee: string;
   time: string;
   status: "todo" | "doing" | "done";
@@ -33,6 +35,7 @@ type TaskCardProps = {
     id: string,
     update: {
       title: string;
+      titleEn?: string;
       assignee: string;
       time: string;
       status: "todo" | "doing" | "done";
@@ -44,6 +47,7 @@ type TaskCardProps = {
   checklist?: {
     id: number;
     title: string;
+    titleEn?: string | null;
     completed: boolean;
     fieldType?: "tick" | "number" | "signature";
     numberValue?: number | null;
@@ -55,20 +59,15 @@ type TaskCardProps = {
     itemId: number,
     completed: boolean,
   ) => void;
-  onAddChecklist?: (taskId: string, title: string) => void | Promise<boolean>;
+  onAddChecklist?: (taskId: string, title: string, titleEn?: string) => void | Promise<boolean>;
   onReportFailure?: (taskId: string, itemId: number) => void;
   department?: string;
-};
-
-const statusLabel = {
-  todo: "CHỜ",
-  doing: "ĐANG LÀM",
-  done: "HOÀN THÀNH",
 };
 
 export function TaskCard({
   id,
   title,
+  titleEn,
   assignee,
   time,
   status,
@@ -85,14 +84,28 @@ export function TaskCard({
   onReportFailure,
   department,
 }: TaskCardProps) {
+  const { locale, t } = useLocale();
+  const displayTitle = locale === "en" && titleEn?.trim() ? titleEn : title;
+  const statusLabel = {
+    todo: t("taskCard.todo").toUpperCase(),
+    doing: t("taskCard.doing").toUpperCase(),
+    done: t("taskCard.completed"),
+  };
+  const currentPriorityLabels = {
+    Low: t("taskCard.priorityLow"),
+    Medium: t("taskCard.priorityMedium"),
+    High: t("taskCard.priorityHigh"),
+  };
   const [isEditing, setIsEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(title);
+  const [draftTitleEn, setDraftTitleEn] = useState(titleEn ?? "");
   const [draftAssignee, setDraftAssignee] = useState(assignee);
   const [draftTime, setDraftTime] = useState(time);
   const [draftStatus, setDraftStatus] = useState(status);
   const [draftPriority, setDraftPriority] = useState(priority);
   const [draftProgress, setDraftProgress] = useState(progress);
   const [newChecklistTitle, setNewChecklistTitle] = useState("");
+  const [newChecklistTitleEn, setNewChecklistTitleEn] = useState("");
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [pending, setPending] = useState<"save" | "add" | "delete" | null>(
     null,
@@ -104,6 +117,7 @@ export function TaskCard({
     setPending("save");
     const saved = await onUpdate?.(id, {
       title: draftTitle.trim(),
+      titleEn: draftTitleEn.trim(),
       assignee: draftAssignee.trim(),
       time: draftTime,
       status: draftStatus,
@@ -118,9 +132,12 @@ export function TaskCard({
     event.preventDefault();
     if (pending || !newChecklistTitle.trim()) return;
     setPending("add");
-    const saved = await onAddChecklist?.(id, newChecklistTitle.trim());
+    const saved = await onAddChecklist?.(id, newChecklistTitle.trim(), newChecklistTitleEn.trim());
     setPending(null);
-    if (saved !== false) setNewChecklistTitle("");
+    if (saved !== false) {
+      setNewChecklistTitle("");
+      setNewChecklistTitleEn("");
+    }
   };
 
   return (
@@ -136,12 +153,14 @@ export function TaskCard({
             onToggleComplete?.(id, status === "done" ? "todo" : "done")
           }
           className="task-checkbox"
-          aria-label={`Đánh dấu hoàn thành: ${title}`}
+          aria-label={`${locale === "en" ? "Mark complete" : "Đánh dấu hoàn thành"}: ${displayTitle}`}
         />
 
         <div className="task-card-content">
           <div className="task-card-header">
-            <h4 className="task-title">{title}</h4>
+            <h4 className="task-title" data-i18n-skip>
+              {displayTitle}
+            </h4>
             <span className={`task-tag status-${status}`}>
               {statusLabel[status]}
             </span>
@@ -165,17 +184,17 @@ export function TaskCard({
               </time>
             </span>
             <span className={`priority-tag priority-${priority.toLowerCase()}`}>
-              {priorityLabels[priority]}
+              {locale === "en" ? currentPriorityLabels[priority] : priorityLabels[priority]}
             </span>
           </div>
           <div className="task-progress-row">
-            <span>Tiến độ</span>
+            <span>{t("taskCard.progress")}</span>
             <strong>{progress}%</strong>
           </div>
           <div
             className="progress-track"
             role="progressbar"
-            aria-label={`Tiến độ ${title}`}
+            aria-label={`Tiến độ ${displayTitle}`}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={progress}
@@ -200,13 +219,17 @@ export function TaskCard({
                       }
                     />
                     <span>
-                      {item.title}
-                      {item.fieldType === "number" ? <small> · {item.numberValue == null ? "Cần nhập giá trị số" : `Giá trị: ${item.numberValue}`}</small> : null}
-                      {item.fieldType === "signature" ? <small> · {item.signedById ? `Đã xác nhận bởi #${item.signedById}` : "Cần ký xác nhận"}</small> : null}
+                      <span data-i18n-skip>
+                        {locale === "en" && item.titleEn?.trim()
+                          ? item.titleEn
+                          : item.title}
+                      </span>
+                      {item.fieldType === "number" ? <small> · {item.numberValue == null ? t("taskCard.numberRequired") : `${t("taskCard.value")}: ${item.numberValue}`}</small> : null}
+                      {item.fieldType === "signature" ? <small> · {item.signedById ? `${t("taskCard.acknowledgedBy")} #${item.signedById}` : t("taskCard.needsSignature")}</small> : null}
                       {item.outcome === "fail" ? (
                         <strong className="task-checklist-failed">
                           {" "}
-                          · Không đạt
+                          · {t("taskCard.failed")}
                         </strong>
                       ) : null}
                     </span>
@@ -217,7 +240,7 @@ export function TaskCard({
                       className="task-checklist-failure"
                       onClick={() => onReportFailure(id, item.id)}
                     >
-                      Báo không đạt
+                      {t("taskCard.reportFailure")}
                     </button>
                   ) : null}
                 </div>
@@ -240,7 +263,7 @@ export function TaskCard({
             <details className="task-add-details">
               <summary>
                 <PlusOutlined aria-hidden="true" />
-                <span>Thêm mục công việc</span>
+                <span>{t("taskCard.addChecklistItem")}</span>
                 <RightOutlined
                   className="task-add-chevron"
                   aria-hidden="true"
@@ -250,16 +273,23 @@ export function TaskCard({
                 <input
                   value={newChecklistTitle}
                   onChange={(event) => setNewChecklistTitle(event.target.value)}
-                  placeholder="Nhập nội dung..."
-                  aria-label="Nội dung mục công việc mới"
+                  placeholder={t("taskCard.enterContent")}
+                  aria-label={t("taskCard.newItemLabel")}
                   required
+                />
+                <input
+                  value={newChecklistTitleEn}
+                  onChange={(event) => setNewChecklistTitleEn(event.target.value)}
+                  placeholder="English checklist item (optional)"
+                  aria-label="English checklist item"
+                  maxLength={255}
                 />
                 <button
                   type="submit"
                   className="mini-action edit"
                   disabled={pending === "add"}
                 >
-                  {pending === "add" ? "Đang lưu..." : "Thêm"}
+                  {pending === "add" ? t("taskCard.saving") : t("taskCard.add")}
                 </button>
               </form>
             </details>
@@ -272,6 +302,7 @@ export function TaskCard({
                 className="mini-action edit"
                 onClick={() => {
                   setDraftTitle(title);
+                  setDraftTitleEn(titleEn ?? "");
                   setDraftAssignee(assignee);
                   setDraftTime(time);
                   setDraftStatus(status);
@@ -280,7 +311,7 @@ export function TaskCard({
                   setIsEditing(true);
                 }}
               >
-                Sửa
+                {t("taskCard.edit")}
               </button>
             ) : null}
             {onDelete ? (
@@ -289,7 +320,7 @@ export function TaskCard({
                 className="mini-action delete"
                 onClick={() => setIsConfirmingDelete(true)}
               >
-                Xóa
+                {t("taskCard.delete")}
               </button>
             ) : null}
           </div>
@@ -307,36 +338,43 @@ export function TaskCard({
               >
                 <div className="task-edit-header">
                   <div>
-                    <span className="eyebrow">Cập nhật thông tin</span>
-                    <h3 id={`task-edit-title-${id}`}>Chỉnh sửa task</h3>
+                    <span className="eyebrow">{t("taskCard.updateInfo")}</span>
+                    <h3 id={`task-edit-title-${id}`}>{t("taskCard.editTask")}</h3>
                   </div>
                   <button
                     type="button"
                     className="close-button"
                     onClick={() => setIsEditing(false)}
-                    aria-label="Đóng cửa sổ chỉnh sửa"
+                    aria-label={t("taskCard.closeEdit")}
                   >
                     ×
                   </button>
                 </div>
                 <form onSubmit={saveTitle}>
-                  <label htmlFor={`task-title-${id}`}>Tiêu đề task</label>
+                  <label htmlFor={`task-title-${id}`}>{t("taskCard.title")}</label>
                   <input
                     id={`task-title-${id}`}
                     value={draftTitle}
                     onChange={(event) => setDraftTitle(event.target.value)}
                     autoFocus
                   />
-                  <label htmlFor={`task-assignee-${id}`}>Người phụ trách</label>
+                  <label htmlFor={`task-title-en-${id}`}>English title (optional)</label>
+                  <input
+                    id={`task-title-en-${id}`}
+                    value={draftTitleEn}
+                    maxLength={255}
+                    onChange={(event) => setDraftTitleEn(event.target.value)}
+                  />
+                  <label htmlFor={`task-assignee-${id}`}>{t("taskCard.assignee")}</label>
                   <input
                     id={`task-assignee-${id}`}
                     value={draftAssignee}
                     readOnly
-                    title="Thay đổi phân công tại trang điều phối"
+                    title={t("taskCard.assignmentHelp")}
                   />
                   <div className="task-form-row">
                     <label htmlFor={`task-time-${id}`}>
-                      Hạn chót
+                      {t("taskCard.dueDate")}
                       <input
                         id={`task-time-${id}`}
                         type="date"
@@ -345,7 +383,7 @@ export function TaskCard({
                       />
                     </label>
                     <label htmlFor={`task-status-${id}`}>
-                      Trạng thái
+                      {t("taskCard.status")}
                       <select
                         id={`task-status-${id}`}
                         value={draftStatus}
@@ -355,15 +393,15 @@ export function TaskCard({
                           )
                         }
                       >
-                        <option value="todo">Chưa bắt đầu</option>
-                        <option value="doing">Đang làm</option>
-                        <option value="done">Hoàn thành</option>
+                        <option value="todo">{t("taskCard.todo")}</option>
+                        <option value="doing">{t("taskCard.doing")}</option>
+                        <option value="done">{t("taskCard.done")}</option>
                       </select>
                     </label>
                   </div>
                   <div className="task-form-row">
                     <label htmlFor={`task-priority-${id}`}>
-                      Mức độ ưu tiên
+                      {t("taskCard.priority")}
                       <select
                         id={`task-priority-${id}`}
                         value={draftPriority}
@@ -373,13 +411,13 @@ export function TaskCard({
                           )
                         }
                       >
-                        <option value="Low">Thấp</option>
-                        <option value="Medium">Trung bình</option>
-                        <option value="High">Cao</option>
+                        <option value="Low">{t("taskCard.low")}</option>
+                        <option value="Medium">{t("taskCard.medium")}</option>
+                        <option value="High">{t("taskCard.high")}</option>
                       </select>
                     </label>
                     <label htmlFor={`task-progress-${id}`}>
-                      Tiến độ: {draftProgress}%
+                      {t("taskCard.progress")}: {draftProgress}%
                       <input
                         id={`task-progress-${id}`}
                         type="range"
@@ -398,14 +436,14 @@ export function TaskCard({
                       className="secondary-action"
                       onClick={() => setIsEditing(false)}
                     >
-                      Hủy
+                      {t("taskCard.cancel")}
                     </button>
                     <button
                       type="submit"
                       className="primary-action"
                       disabled={pending === "save"}
                     >
-                      {pending === "save" ? "Đang lưu..." : "Lưu thay đổi"}
+                      {pending === "save" ? t("taskCard.saving") : t("taskCard.saveChanges")}
                     </button>
                   </div>
                 </form>
@@ -428,10 +466,9 @@ export function TaskCard({
                 aria-modal="true"
                 aria-labelledby={`task-delete-title-${id}`}
               >
-                <h3 id={`task-delete-title-${id}`}>Xác nhận xoá task</h3>
+                <h3 id={`task-delete-title-${id}`}>{t("taskCard.confirmDelete")}</h3>
                 <p>
-                  Bạn có chắc muốn xoá <strong>{title}</strong>? Thao tác này sẽ
-                  xoá task khỏi danh sách hiện tại.
+                  {locale === "en" ? "Are you sure you want to delete" : "Bạn có chắc muốn xóa"} <strong>{displayTitle}</strong>? {locale === "en" ? "It will be removed from the current list." : "Thao tác này sẽ xóa công việc khỏi danh sách hiện tại."}
                 </p>
                 <div className="task-modal-actions">
                   <button
@@ -439,7 +476,7 @@ export function TaskCard({
                     className="secondary-action"
                     onClick={() => setIsConfirmingDelete(false)}
                   >
-                    Huỷ
+                    {t("taskCard.cancel")}
                   </button>
                   <button
                     type="button"
@@ -453,7 +490,7 @@ export function TaskCard({
                       if (deleted !== false) setIsConfirmingDelete(false);
                     }}
                   >
-                    {pending === "delete" ? "Đang xóa..." : "Xóa công việc"}
+                    {pending === "delete" ? t("taskCard.saving") : t("taskCard.deleteTask")}
                   </button>
                 </div>
               </div>

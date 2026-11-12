@@ -8,7 +8,7 @@ const refreshCookie = "careops_refresh";
 const deviceCookie = "careops_device";
 type Tokens = { accessToken: string; refreshToken: string; sessionExpiresAt?: number; deviceToken?: string; deviceExpiresAt?: number; user: unknown };
 const publicAuth = new Set(["auth/login", "auth/verify-login-otp", "auth/forgot-password", "auth/reset-password", "auth/initial-password-change"]);
-const roots = new Set(["auth", "users", "departments", "branches", "tasks", "kpi", "reports", "task-logs", "notifications", "work", "organization", "advanced-operations", "hospital-operations", "operations"]);
+const roots = new Set(["auth", "users", "departments", "branches", "tasks", "kpi", "reports", "task-logs", "notifications", "work", "organization", "advanced-operations", "hospital-operations", "operations", "i18n"]);
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/" };
 function clearSession(response: NextResponse) {
   for (const name of [sessionCookie, refreshCookie, "accessToken", "refreshToken"]) response.cookies.set(name, "", { ...cookieOptions, maxAge: 0 });

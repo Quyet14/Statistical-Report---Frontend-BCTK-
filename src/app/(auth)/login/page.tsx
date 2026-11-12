@@ -187,9 +187,9 @@ export default function LoginPage() {
       </section>
 
       <section className="auth-panel">
-        <div className="auth-card">
+        <div className="auth-card" data-auth-step={step}>
           <div className="auth-card-header">
-            <Image className="auth-logo" src="/hospital-logo.png" alt="Logo bệnh viện" width={72} height={72} priority />
+            {step === "otp" ? <div className="otp-security-mark" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="5" y="10" width="14" height="11" rx="3" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /><path d="M12 14v3" /></svg></div> : <Image className="auth-logo" src="/hospital-logo.png" alt="Logo bệnh viện" width={72} height={72} priority />}
             <div className="auth-brand">HuuNghi CareOps</div>
             <h1>{step === "login" ? "Chào mừng trở lại" : step === "otp" ? "Xác minh đăng nhập" : "Đổi mật khẩu lần đầu"}</h1>
             <p className="auth-card-subtitle">
@@ -202,7 +202,7 @@ export default function LoginPage() {
           </div>
 
           {cooldown.seconds > 0 ? <div className="auth-alert" role="status">Vui lòng thử lại sau {cooldown.seconds} giây.</div> : null}
-          {message ? <div className="auth-alert auth-alert-success">{message}</div> : null}
+          {message && step !== "otp" ? <div className="auth-alert auth-alert-success">{message}</div> : null}
           {error ? <div className="auth-alert auth-alert-error">{error}</div> : null}
           {step === "login" && idleLock && device.remembered && device.autoLogin ? <button type="button" className="auth-primary" disabled={isLoading} onClick={async () => { setIsLoading(true); clearFeedback(); try { await refreshCurrentUser(); window.location.replace("/checklist"); } catch (reason) { setError(reason instanceof Error ? reason.message : "Vui lòng đăng nhập lại."); } finally { setIsLoading(false); } }}>Tiếp tục trên thiết bị này</button> : null}
 
@@ -235,12 +235,13 @@ export default function LoginPage() {
 
               <div className="auth-captcha">
                 <label className="auth-label" htmlFor="login-captcha">Mã xác nhận</label>
-                <div className="captcha-preview">
-                  {captchaImage ? <img src={captchaImage} alt="Ảnh mã CAPTCHA gồm 6 ký tự" width={210} height={56} /> : <span role="status">{captchaLoading ? "Đang tải mã…" : "Chưa tải được mã"}</span>}
-                  <button type="button" className="auth-text-button" disabled={captchaLoading || isLoading || cooldown.seconds > 0} onClick={() => void loadCaptcha()} aria-label="Đổi mã CAPTCHA">↻ Đổi mã</button>
+                <div className="captcha-row">
+                  <div className="captcha-preview">
+                    {captchaImage ? <img src={captchaImage} alt="Ảnh mã CAPTCHA gồm 6 ký tự" width={210} height={56} /> : <span role="status">{captchaLoading ? "Đang tải mã…" : "Chưa tải được mã"}</span>}
+                    <button type="button" className="auth-text-button" disabled={captchaLoading || isLoading || cooldown.seconds > 0} onClick={() => void loadCaptcha()} aria-label="Đổi mã CAPTCHA" title="Đổi mã CAPTCHA">↻</button>
+                  </div>
+                  <input id="login-captcha" className="auth-input captcha-answer" value={captcha} onChange={event => setCaptcha(event.target.value.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, 6))} autoComplete="off" autoCapitalize="characters" spellCheck={false} placeholder="Nhập mã" maxLength={6} required />
                 </div>
-                <input id="login-captcha" className="auth-input captcha-answer" value={captcha} onChange={event => setCaptcha(event.target.value.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, 6))} autoComplete="off" autoCapitalize="characters" spellCheck={false} placeholder="Nhập 6 ký tự trong ảnh" maxLength={6} required aria-describedby="captcha-note" />
-                <small id="captcha-note" className="auth-step-note">Không phân biệt chữ hoa, chữ thường.</small>
               </div>
 
               <div className="auth-link-row">
@@ -250,10 +251,10 @@ export default function LoginPage() {
                 </button>
               </div>
 
-              <label className="remember-device-option"><input type="checkbox" checked={rememberDevice} onChange={event => setRememberDevice(event.target.checked)} /><span><strong>Ghi nhớ thiết bị cá nhân này</strong><small>Tự vào lại và bỏ qua OTP trên thiết bị này trong 30 ngày. Không chọn trên máy dùng chung.</small></span></label>
+              <label className="remember-device-option"><input type="checkbox" checked={rememberDevice} onChange={event => setRememberDevice(event.target.checked)} /><span><strong>Ghi nhớ thiết bị cá nhân này</strong></span></label>
 
               <button type="submit" disabled={isLoading || cooldown.seconds > 0 || captchaLoading || !captchaImage || captcha.length !== 6} className="auth-primary">
-                {isLoading ? "Đang gửi mã..." : "Tiếp tục"}
+                {isLoading ? <span className="auth-loading-spinner" aria-hidden="true" /> : null}{isLoading ? "Đang gửi mã..." : "Tiếp tục"}
               </button>
             </form>
           ) : step === "otp" ? (
@@ -264,7 +265,7 @@ export default function LoginPage() {
               <p className="auth-step-note">Kiểm tra cả thư mục Spam nếu bạn chưa thấy email.</p>
 
               <button type="submit" disabled={isLoading || cooldown.seconds > 0 || !/^\d{6}$/.test(otp)} className="auth-primary">
-                {isLoading ? "Đang xác minh..." : "Xác nhận và đăng nhập"}
+                {isLoading ? <span className="auth-loading-spinner" aria-hidden="true" /> : null}{isLoading ? "Đang xác minh..." : "Xác nhận và đăng nhập"}
               </button>
               <button type="button" disabled={isLoading} className="auth-secondary" onClick={returnToLogin}>
                 Dùng email khác

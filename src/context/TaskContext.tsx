@@ -17,6 +17,7 @@ import { persistedTaskState } from "@/lib/task-state";
 
 export type TaskDraft = {
   title: string;
+  titleEn?: string;
   assignee: string;
   assigneeId?: number;
   time: string;
@@ -24,6 +25,7 @@ export type TaskDraft = {
   priority: TaskPriority;
   progress: number;
   checklistTitles?: string[];
+  checklistTitlesEn?: string[];
   reviewerId?: number;
 };
 
@@ -44,12 +46,17 @@ type TaskContextValue = {
     itemId: number,
     completed: boolean,
   ) => Promise<boolean>;
-  addChecklistItem: (taskId: string, title: string) => Promise<boolean>;
+  addChecklistItem: (
+    taskId: string,
+    title: string,
+    titleEn?: string,
+  ) => Promise<boolean>;
 };
 
 type RawChecklistItem = {
   id: number;
   title: string;
+  titleEn?: string | null;
   completed: boolean;
   outcome?: "pending" | "pass" | "fail" | "na";
 };
@@ -78,6 +85,7 @@ type RawTask = {
   priority?: string;
   isRecurring?: boolean;
   checklist?: RawChecklistItem[];
+  titleEn?: string | null;
 };
 
 const clampProgress = (value: unknown) => {
@@ -116,6 +124,7 @@ const normalizeTask = (item: RawTask): TaskItem => {
   return {
     id: String(item.id),
     title: item.title,
+    titleEn: item.titleEn ?? undefined,
     assigneeId: item.assigneeId,
     departmentId: item.departmentId,
     departmentName: item.departmentName ?? item.department,
@@ -214,8 +223,17 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addTask = async (task: TaskDraft) => {
+    const checklistTitles = task.checklistTitles ?? [];
+    const checklistTitlesEn = task.checklistTitlesEn ?? [];
+    const checklist = checklistTitles
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const checklistEn = checklistTitles
+      .map((item, index) => (item.trim() ? checklistTitlesEn[index]?.trim() ?? "" : null))
+      .filter((item): item is string => item !== null);
     const payload = {
       title: task.title.trim(),
+      ...(task.titleEn?.trim() ? { titleEn: task.titleEn.trim() } : {}),
       assigneeId: task.assigneeId,
       reviewerId: task.reviewerId,
       dueDate: task.time.match(/^\d{4}-\d{2}-\d{2}/)?.[0],
@@ -223,9 +241,8 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       isRecurring: false,
       status: task.status,
       progress: task.progress,
-      checklist: task.checklistTitles
-        ?.map((item) => item.trim())
-        .filter(Boolean),
+      checklist,
+      ...(checklistEn.some(Boolean) ? { checklistEn } : {}),
     };
 
     const result = await runAction(() => api.post<RawTask>("/tasks", payload), {
@@ -252,12 +269,16 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       priority: update.priority ?? currentTask.priority,
       progress: nextState.progress,
       title: update.title ?? currentTask.title,
+      titleEn: update.titleEn ?? currentTask.titleEn,
       assignee: update.assignee ?? currentTask.assignee,
       time: update.time ?? currentTask.time,
     };
 
     const payload = {
       title: nextTask.title,
+      ...(update.titleEn !== undefined
+        ? { titleEn: nextTask.titleEn?.trim() ?? "" }
+        : {}),
       assigneeId: nextTask.assigneeId,
       dueDate: nextTask.time.match(/^\d{4}-\d{2}-\d{2}/)?.[0],
       priority: nextTask.priority.toLowerCase(),
@@ -313,11 +334,12 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     );
     return true;
   };
-  const addChecklistItem = async (taskId: string, title: string) => {
+  const addChecklistItem = async (taskId: string, title: string, titleEn = "") => {
     const result = await runAction(
       () =>
         api.post<RawTask>(`/tasks/${taskId}/checklist`, {
           title: title.trim(),
+          ...(titleEn.trim() ? { titleEn: titleEn.trim() } : {}),
         }),
       { title: "Đã thêm mục checklist" },
     );

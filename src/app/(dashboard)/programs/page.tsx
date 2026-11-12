@@ -12,6 +12,7 @@ import { getStoredUser } from "@/lib/auth";
 import { useFeedback } from "@/context/FeedbackContext";
 import { useTasks } from "@/context/TaskContext";
 import { reportWorkbook } from "@/lib/report-xlsx";
+import { useLocale } from "@/i18n/locale-provider";
 import "./programs.css";
 
 const kinds = [
@@ -33,7 +34,9 @@ type RecordItem = {
   creatorName?: string;
   createdById: number;
   title: string;
+  titleEn?: string | null;
   description?: string;
+  descriptionEn?: string | null;
   status: string;
   version: number;
   acknowledgedVersion?: number | null;
@@ -248,6 +251,7 @@ const formatSurveyAnswer = (value: unknown): string => {
 
 export default function ProgramsPage() {
   const user = getStoredUser();
+  const { locale } = useLocale();
   const { runAction } = useFeedback();
   const { tasks } = useTasks();
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
@@ -262,12 +266,15 @@ export default function ProgramsPage() {
   const [busy, setBusy] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const [titleEn, setTitleEn] = useState("");
   const [description, setDescription] = useState("");
+  const [descriptionEn, setDescriptionEn] = useState("");
   const [departmentId, setDepartmentId] = useState(
     String(user?.departmentId ?? ""),
   );
   const [ownerId, setOwnerId] = useState("");
   const [content, setContent] = useState("");
+  const [contentEn, setContentEn] = useState("");
   const [shiftType, setShiftType] = useState("Ca ngày");
   const [shiftRepeat, setShiftRepeat] = useState("none");
   const [shiftRepeatUntil, setShiftRepeatUntil] = useState("");
@@ -385,9 +392,12 @@ export default function ProgramsPage() {
   const resetForm = () => {
     setEditingRecordId(null);
     setTitle("");
+    setTitleEn("");
     setDescription("");
+    setDescriptionEn("");
     setOwnerId("");
     setContent("");
+    setContentEn("");
     setShiftRepeat("none");
     setShiftRepeatUntil("");
     setHandoverNotes("");
@@ -399,7 +409,7 @@ export default function ProgramsPage() {
   };
 
   const buildPayload = () => {
-    if (kind === "sop") return { content };
+    if (kind === "sop") return { content, contentEn: contentEn.trim() };
     if (kind === "shift")
       return {
         shiftType,
@@ -483,7 +493,9 @@ export default function ProgramsPage() {
               kind,
               departmentId: Number(departmentId),
               title: title.trim(),
+              titleEn: titleEn.trim(),
               description: description.trim(),
+              descriptionEn: descriptionEn.trim(),
               payload: buildPayload(),
             })
           : api.post("/advanced-operations", {
@@ -491,7 +503,9 @@ export default function ProgramsPage() {
               departmentId: Number(departmentId),
               ...(ownerId ? { ownerId: Number(ownerId) } : {}),
               title: title.trim(),
+              titleEn: titleEn.trim(),
               description: description.trim(),
+              descriptionEn: descriptionEn.trim(),
               payload: buildPayload(),
             }),
       { title: "Đã lưu hồ sơ", description: title.trim() },
@@ -555,9 +569,12 @@ export default function ProgramsPage() {
   async function editSop(record: RecordItem) {
     setEditingRecordId(record.id);
     setTitle(record.title);
+    setTitleEn(record.titleEn ?? "");
     setDescription(record.description ?? "");
+    setDescriptionEn(record.descriptionEn ?? "");
     setDepartmentId(String(record.departmentId));
     setContent(String(record.payload.content ?? ""));
+    setContentEn(String(record.payload.contentEn ?? ""));
     setFormOpen(true);
   }
 
@@ -774,28 +791,39 @@ export default function ProgramsPage() {
   function renderEditorFields() {
     if (kind === "sop")
       return (
-        <label>
-          Nội dung SOP
-          <textarea
-            required
-            minLength={10}
-            maxLength={4000}
-            value={content}
-            onChange={(event) => setContent(event.target.value)}
-          />
-        </label>
+        <>
+          <label>
+            {locale === "en" ? "SOP content" : "Nội dung SOP"}
+            <textarea
+              required
+              minLength={10}
+              maxLength={4000}
+              value={content}
+              onChange={(event) => setContent(event.target.value)}
+            />
+          </label>
+          <label>
+            {locale === "en" ? "SOP content in English (optional)" : "Nội dung SOP tiếng Anh (không bắt buộc)"}
+            <textarea
+              maxLength={4000}
+              value={contentEn}
+              onChange={(event) => setContentEn(event.target.value)}
+            />
+          </label>
+        </>
       );
     if (kind === "shift")
       return (
         <>
           {capabilities?.shiftTaskGeneration ? (
             <p className="programs-warning">
-              Khi phát hành, hệ thống tạo một công việc cho nhân viên phụ trách
-              cho mỗi ca trong 30 ngày tới. Không tự gán người duyệt.
+              {locale === "en"
+                ? "Publishing creates one task for the assigned employee for each shift in the next 30 days. No reviewer is assigned automatically."
+                : "Khi phát hành, hệ thống tạo một công việc cho nhân viên phụ trách cho mỗi ca trong 30 ngày tới. Không tự gán người duyệt."}
             </p>
           ) : null}
           <label>
-            Loại ca
+            {locale === "en" ? "Shift type" : "Loại ca"}
             <input
               required
               maxLength={80}
@@ -805,7 +833,7 @@ export default function ProgramsPage() {
           </label>
           <div className="programs-two-columns">
             <label>
-              Bắt đầu
+              {locale === "en" ? "Starts" : "Bắt đầu"}
               <input
                 required
                 type="datetime-local"
@@ -814,7 +842,7 @@ export default function ProgramsPage() {
               />
             </label>
             <label>
-              Kết thúc
+              {locale === "en" ? "Ends" : "Kết thúc"}
               <input
                 required
                 type="datetime-local"
@@ -824,7 +852,7 @@ export default function ProgramsPage() {
             </label>
           </div>
           <label>
-            Lặp lịch
+            {locale === "en" ? "Repeat schedule" : "Lặp lịch"}
             <select
               value={shiftRepeat}
               onChange={(event) => setShiftRepeat(event.target.value)}
@@ -836,13 +864,14 @@ export default function ProgramsPage() {
               ))}
             </select>
             <small>
-              Ca lặp được tính từ ngày bắt đầu; phải chọn ngày kết thúc. Mỗi lần
-              trực tạo tối đa một công việc.
+              {locale === "en"
+                ? "Recurring shifts are calculated from the start date; an end date is required. Each shift creates at most one task."
+                : "Ca lặp được tính từ ngày bắt đầu; phải chọn ngày kết thúc. Mỗi lần trực tạo tối đa một công việc."}
             </small>
           </label>
           {shiftRepeat !== "none" ? (
             <label>
-              Lặp đến (bao gồm ngày)
+              {locale === "en" ? "Repeat until (inclusive)" : "Lặp đến (bao gồm ngày)"}
               <input
                 type="date"
                 required
@@ -960,7 +989,6 @@ export default function ProgramsPage() {
     return (
       <main className="programs-page">
         <header>
-          <p className="programs-eyebrow">KẾ HOẠCH & CHẤT LƯỢNG</p>
           <h1>Nghiệp vụ chuyên sâu</h1>
         </header>
         <section className="programs-notice">
@@ -976,11 +1004,7 @@ export default function ProgramsPage() {
     <main className="programs-page">
       <header className="programs-heading">
         <div>
-          <p className="programs-eyebrow">KẾ HOẠCH & CHẤT LƯỢNG</p>
           <h1>Nghiệp vụ chuyên sâu</h1>
-          <p>
-            SOP, lịch trực, đào tạo, kiểm tra, OKR và khảo sát theo khoa/phòng.
-          </p>
         </div>
         {canManage && capabilities?.enabled ? (
           <button
@@ -1064,21 +1088,21 @@ export default function ProgramsPage() {
       {capabilities?.enabled && capabilities.integrations ? (
         <details
           className="programs-integrations"
-          aria-label="Trạng thái tích hợp"
+          aria-label={locale === "en" ? "Integration status" : "Trạng thái tích hợp"}
         >
-          <summary>Tích hợp ngoài hệ thống <span>Xem trạng thái kết nối</span></summary>
+          <summary>{locale === "en" ? "External integrations" : "Tích hợp ngoài hệ thống"} <span>{locale === "en" ? "View connection status" : "Xem trạng thái kết nối"}</span></summary>
           <div className="programs-integration-items">
           {Object.entries(capabilities.integrations).map(
             ([key, configured]) => (
               <span key={key} className={configured ? "is-configured" : ""}>
                 {integrationNames[key.toLowerCase()] ?? key}:{" "}
-                {configured ? "Đã cấu hình" : "Chưa cấu hình"}
+                {configured ? (locale === "en" ? "Configured" : "Đã cấu hình") : (locale === "en" ? "Not configured" : "Chưa cấu hình")}
               </span>
             ),
           )}
           </div>
           {!capabilities.automationExecution ? (
-            <p className="programs-footnote">Quy tắc tự động đang tắt.</p>
+            <p className="programs-footnote">{locale === "en" ? "Automation rules are disabled." : "Quy tắc tự động đang tắt."}</p>
           ) : null}
         </details>
       ) : null}
@@ -1089,12 +1113,12 @@ export default function ProgramsPage() {
         >
           <h2>
             {editingRecordId
-              ? "Tạo phiên bản SOP mới"
-              : `${kinds.find(([value]) => value === kind)?.[1]} mới`}
+              ? (locale === "en" ? "Create new SOP version" : "Tạo phiên bản SOP mới")
+              : `${kinds.find(([value]) => value === kind)?.[1]} ${locale === "en" ? "new" : "mới"}`}
           </h2>
           <div className="programs-two-columns">
             <label>
-              Tiêu đề
+              {locale === "en" ? "Title" : "Tiêu đề"}
               <input
                 required
                 maxLength={200}
@@ -1103,14 +1127,22 @@ export default function ProgramsPage() {
               />
             </label>
             <label>
-              Khoa/phòng
+              {locale === "en" ? "English title (optional)" : "Tiêu đề tiếng Anh (không bắt buộc)"}
+              <input
+                maxLength={200}
+                value={titleEn}
+                onChange={(event) => setTitleEn(event.target.value)}
+              />
+            </label>
+            <label>
+              {locale === "en" ? "Department" : "Khoa/phòng"}
               <select
                 required
                 value={departmentId}
                 onChange={(event) => setDepartmentId(event.target.value)}
               >
                 {user?.role === "admin" ? (
-                  <option value="">Chọn khoa/phòng</option>
+                  <option value="">{locale === "en" ? "Select a department" : "Chọn khoa/phòng"}</option>
                 ) : null}
                 {departmentChoices.map((item) => (
                   <option key={item.id} value={item.id}>
@@ -1121,13 +1153,13 @@ export default function ProgramsPage() {
             </label>
             {["shift", "training", "inspection"].includes(kind) ? (
               <label>
-                {kind === "inspection" ? "Người phụ trách" : "Nhân viên"}
+                {kind === "inspection" ? (locale === "en" ? "Assignee" : "Người phụ trách") : (locale === "en" ? "Employee" : "Nhân viên")}
                 <select
                   required
                   value={ownerId}
                   onChange={(event) => setOwnerId(event.target.value)}
                 >
-                  <option value="">Chọn nhân viên</option>
+                  <option value="">{locale === "en" ? "Select an employee" : "Chọn nhân viên"}</option>
                   {people
                     .filter(
                       (person) =>
@@ -1142,29 +1174,37 @@ export default function ProgramsPage() {
               </label>
             ) : null}
             <label>
-              Mô tả
+              {locale === "en" ? "Description" : "Mô tả"}
               <textarea
                 maxLength={4000}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
               />
             </label>
+            <label>
+              {locale === "en" ? "English description (optional)" : "Mô tả tiếng Anh (không bắt buộc)"}
+              <textarea
+                maxLength={4000}
+                value={descriptionEn}
+                onChange={(event) => setDescriptionEn(event.target.value)}
+              />
+            </label>
           </div>
           {renderEditorFields()}
           <button className="primary-action" disabled={busy}>
-            {busy ? "Đang lưu…" : "Lưu bản nháp"}
+            {busy ? (locale === "en" ? "Saving…" : "Đang lưu…") : (locale === "en" ? "Save draft" : "Lưu bản nháp")}
           </button>
         </form>
       ) : null}
       {loading ? (
-        <p className="programs-empty" role="status">Đang tải hồ sơ…</p>
+        <p className="programs-empty" role="status">{locale === "en" ? "Loading records…" : "Đang tải hồ sơ…"}</p>
       ) : records.length === 0 ? (
         <section className="programs-empty">
           <span className="programs-empty-icon" aria-hidden="true">▤</span>
-          <h2>Chưa có hồ sơ {kinds.find(([value]) => value === kind)?.[1]}</h2>
-          <p>Hồ sơ trong nhóm này sẽ được hiển thị tại đây để theo dõi và quản lý.</p>
+          <h2>{locale === "en" ? `No ${kind} records yet` : `Chưa có hồ sơ ${kinds.find(([value]) => value === kind)?.[1]}`}</h2>
+          <p>{locale === "en" ? "Records in this category will appear here for tracking and management." : "Hồ sơ trong nhóm này sẽ được hiển thị tại đây để theo dõi và quản lý."}</p>
           {canManage && capabilities?.enabled && !formOpen ? (
-            <button type="button" className="primary-action" onClick={() => setFormOpen(true)}>Tạo hồ sơ đầu tiên</button>
+            <button type="button" className="primary-action" onClick={() => setFormOpen(true)}>{locale === "en" ? "Create the first record" : "Tạo hồ sơ đầu tiên"}</button>
           ) : null}
         </section>
       ) : (
@@ -1172,6 +1212,20 @@ export default function ProgramsPage() {
           {records.map((record) => {
             const payload = record.payload ?? {};
             const isCreator = record.createdById === user?.id;
+            const displayTitle =
+              locale === "en" && record.titleEn?.trim()
+                ? record.titleEn
+                : record.title;
+            const displayDescription =
+              locale === "en" && record.descriptionEn?.trim()
+                ? record.descriptionEn
+                : record.description;
+            const displaySopContent =
+              locale === "en" &&
+              typeof payload.contentEn === "string" &&
+              payload.contentEn.trim()
+                ? payload.contentEn
+                : payload.content;
             return (
               <article className="programs-card" key={record.id}>
                 <header>
@@ -1179,15 +1233,15 @@ export default function ProgramsPage() {
                     <span className={`programs-status status-${record.status}`}>
                       {statusNames[record.status] ?? record.status}
                     </span>
-                    <h2>{record.title}</h2>
+                    <h2 data-i18n-skip>{displayTitle}</h2>
                   </div>
                   <span className="programs-version">v{record.version}</span>
                 </header>
-                {record.description ? <p>{record.description}</p> : null}
+                {displayDescription ? <p data-i18n-skip>{displayDescription}</p> : null}
                 {kind === "sop" ? (
                   <>
-                    <div className="programs-content">
-                      {String(payload.content ?? "")}
+                    <div className="programs-content" data-i18n-skip>
+                      {String(displaySopContent ?? "")}
                     </div>
                     {record.status === "published" &&
                     user?.role !== "viewer" ? (
@@ -1241,7 +1295,13 @@ export default function ProgramsPage() {
                               )}
                             </summary>
                             <div className="programs-content">
-                              {String(version.snapshot.payload?.content ?? "")}
+                              {String(
+                                locale === "en" &&
+                                  typeof version.snapshot.payload?.contentEn === "string" &&
+                                  version.snapshot.payload.contentEn.trim()
+                                  ? version.snapshot.payload.contentEn
+                                  : version.snapshot.payload?.content ?? "",
+                              )}
                             </div>
                           </details>
                         ))}

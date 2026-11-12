@@ -465,9 +465,6 @@ function HospitalOperationsContent() {
         <div>
           <span className="eyebrow">Nghiệp vụ bệnh viện</span>
           <h3 className="page-title">Điều phối & an toàn vận hành</h3>
-          <p className="page-description">
-            Yêu cầu liên khoa, theo dõi sự cố checklist và kiểm tra thiết bị.
-          </p>
         </div>
       </div>
       {error ? (

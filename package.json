@@ -10,6 +10,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --test --test-isolation=none tests/*.test.cjs",
+    "i18n:catalog": "node scripts/generate-ui-catalog.cjs",
     "test:e2e": "npm run build && playwright test",
     "test:e2e:run": "playwright test",
     "config:check": "node scripts/deployment-config.cjs --check"
@@ -28,6 +29,9 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "sharp": "^0.35.5"
+  },
+  "overrides": {
+    "minimatch@>=7.0.0 <11.0.1": "11.0.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

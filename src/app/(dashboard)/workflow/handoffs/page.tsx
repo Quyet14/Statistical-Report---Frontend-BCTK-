@@ -197,10 +197,6 @@ export default function HandoffsPage() {
             Liên tục trách nhiệm · Giữ nguyên lịch sử
           </span>
           <h1 className="page-title">Bàn giao & tiếp nhận</h1>
-          <p className="page-description">
-            Chỉ đổi người thực hiện sau khi người nhận xác nhận. Cả đợt được cập
-            nhật trong một giao dịch.
-          </p>
         </div>
         <Link className="secondary-action" href="/workflow">
           Về công việc

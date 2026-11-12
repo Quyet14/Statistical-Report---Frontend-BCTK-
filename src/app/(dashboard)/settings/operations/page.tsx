@@ -96,10 +96,6 @@ export default function BackupOperations() {
         <div>
           <span className="eyebrow">VẬN HÀNH HỆ THỐNG</span>
           <h1 className="page-title">Sao lưu & kiểm tra khôi phục</h1>
-          <p className="page-description">
-            Bản mã hóa gồm cơ sở dữ liệu và file minh chứng, được kiểm tra trên
-            vùng dữ liệu riêng.
-          </p>
         </div>
         <button
           className="secondary-action"

@@ -1,5 +1,6 @@
 param(
-    [ValidateSet('start', 'stop', 'status')][string]$Action = 'status',
+    [ValidateSet('start', 'stop', 'status', 'preflight')][string]$Action = 'status',
+    [ValidateSet('all', 'frontend', 'backend')][string]$Service = 'all',
     [string]$ConfigDirectory,
     [switch]$OpenFirewall
 )
@@ -15,6 +16,18 @@ $nginxPrefix = $nginxDirectory.Replace('\', '/') + '/'
 $nginxConfig = (Join-Path $runtimeDirectory 'nginx.conf').Replace('\', '/')
 $nodeExecutable = (Get-Command node).Source
 $runner = Join-Path $frontendRoot 'scripts/run-service.cjs'
+function Assert-ServicePortsFree {
+    $ports = @()
+    if ($Service -in @('all', 'frontend')) { $ports += [int]$manifest.frontendPort }
+    if ($Service -in @('all', 'backend')) { $ports += [int]$manifest.backendPort }
+    foreach ($port in $ports) {
+        $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $port)
+        try { $listener.Start() }
+        catch { throw "Port $port is already occupied. No existing process was stopped. Use the managed LAN launcher instead of starting a second server." }
+        finally { $listener.Stop() }
+    }
+}
+if ($Action -eq 'preflight') { Assert-ServicePortsFree; Write-Output 'Service ports are available.'; exit 0 }
 if ($Action -eq 'status') {
     if (Test-Path -LiteralPath $statePath) { Get-Content -LiteralPath $statePath } else { Write-Output 'No managed LAN services recorded.' }
     exit 0
@@ -23,8 +36,10 @@ if ($Action -eq 'stop') {
     if (Test-Path -LiteralPath $statePath) {
         $state = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
         $allProcesses = @(Get-CimInstance Win32_Process)
-        foreach ($service in $state.services) {
-            $rootProcess = $allProcesses | Where-Object { $_.ProcessId -eq $service.pid -and $_.CommandLine -like "*$runner*" }
+        foreach ($record in $state.services) {
+            if ($record.managed -eq $false) { continue }
+            if ($Service -ne 'all' -and $record.name -ne $Service) { continue }
+            $rootProcess = $allProcesses | Where-Object { $_.ProcessId -eq $record.pid -and $_.CommandLine -like "*$runner*" -and $_.CommandLine -like "*$runtimeDirectory*" -and $_.CommandLine -match ("\s" + [regex]::Escape($record.name) + "\s") }
             if (!$rootProcess) { continue }
             $ownedIds = [Collections.Generic.List[int]]::new()
             $ownedIds.Add([int]$rootProcess.ProcessId)
@@ -32,11 +47,30 @@ if ($Action -eq 'stop') {
                 foreach ($childProcess in $allProcesses | Where-Object { $_.ParentProcessId -eq $ownedIds[$index] }) { $ownedIds.Add([int]$childProcess.ProcessId) }
             }
             for ($index = $ownedIds.Count - 1; $index -ge 0; $index--) { Stop-Process -Id $ownedIds[$index] -ErrorAction SilentlyContinue }
+            foreach ($ownedId in $ownedIds) { Wait-Process -Id $ownedId -Timeout 10 -ErrorAction SilentlyContinue }
         }
-        if (Test-Path -LiteralPath $nginxExecutable) { & $nginxExecutable -p $nginxPrefix -c $nginxConfig -s quit }
-        Remove-Item -LiteralPath $statePath
+        if ($Service -eq 'all') {
+            if (Test-Path -LiteralPath $nginxExecutable) { & $nginxExecutable -p $nginxPrefix -c $nginxConfig -s quit }
+            Remove-Item -LiteralPath $statePath
+        } else {
+            $state.services = @($state.services | Where-Object { $_.name -ne $Service })
+            $state | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $statePath -Encoding UTF8
+        }
     }
-    Write-Output 'Managed Node/gateway services stopped. Redis data/volume retained.'
+    if ($Service -eq 'all') { Write-Output 'Managed Node/gateway services stopped. Redis data/volume retained.' }
+    else { Write-Output "Stopped managed $Service only; other services were retained." }
+    exit 0
+}
+Assert-ServicePortsFree
+if ($Service -ne 'all') {
+    if (!(Test-Path -LiteralPath $statePath)) { throw 'Start the complete LAN stack before restarting an individual service.' }
+    $state = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
+    if (@($state.services | Where-Object { $_.name -eq $Service }).Count) { throw 'Stop the selected managed service first.' }
+    $arguments = @('"' + $runner + '"', $Service, '"' + $runtimeDirectory + '"')
+    $childProcess = Start-Process -FilePath $nodeExecutable -ArgumentList $arguments -WorkingDirectory $frontendRoot -WindowStyle Hidden -RedirectStandardOutput (Join-Path $runtimeDirectory "$Service.out.log") -RedirectStandardError (Join-Path $runtimeDirectory "$Service.err.log") -PassThru
+    $state.services = @($state.services) + @{ name = $Service; pid = $childProcess.Id }
+    $state | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $statePath -Encoding UTF8
+    Write-Output "Started $Service; other services and gateway were retained."
     exit 0
 }
 if (Test-Path -LiteralPath $statePath) {
@@ -44,7 +78,7 @@ if (Test-Path -LiteralPath $statePath) {
     $processes = @(Get-CimInstance Win32_Process)
     $ownedServices = @($previousState.services | Where-Object {
         $record = $_
-        $processes | Where-Object { $_.ProcessId -eq $record.pid -and $_.CommandLine -like "*$runner*" }
+        if ($record.managed -ne $false) { $processes | Where-Object { $_.ProcessId -eq $record.pid -and $_.CommandLine -like "*$runner*" } }
     })
     $ownedGateway = @($processes | Where-Object { $_.ProcessId -eq $previousState.gatewayPid -and $_.ExecutablePath -eq $nginxExecutable })
     if ($ownedServices.Count -or $ownedGateway.Count) { throw 'Managed services are still running. Check status before starting another instance.' }

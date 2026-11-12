@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { getStoredUser } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { canAccessRoute } from "@/lib/access";
+import { useLocale } from "@/i18n/locale-provider";
 import {
   CalendarOutlined,
   CheckSquareOutlined,
@@ -51,6 +52,23 @@ const menuItems = [
     { key: "/settings/operations", label: "Sao lưu & vận hành", icon: SettingOutlined },
 ];
 
+const menuTranslationKeys: Record<string, Parameters<ReturnType<typeof useLocale>["t"]>[0]> = {
+  "/checklist": "nav.today",
+  "/personal-checklist": "nav.personal",
+  "/tasks": "nav.tasks",
+  "/archive": "nav.archive",
+  "/workflow": "nav.workflow",
+  "/hospital-operations": "nav.hospital",
+  "/programs": "nav.programs",
+  "/notifications": "nav.notifications",
+  "/reports": "nav.reports",
+  "/kpi": "nav.kpi",
+  "/employees": "nav.employees",
+  "/departments": "nav.departments",
+  "/organization": "nav.organization",
+  "/settings/operations": "nav.settings",
+};
+
 const menuGroups = [
   {
     id: "work",
@@ -78,56 +96,65 @@ const menuGroups = [
 type SidebarPreferences = { collapsed: boolean; closedGroups: string[] };
 const preferencesKey = "careops-navigation-v2";
 
+function loadPreferences(): SidebarPreferences {
+  if (typeof window === "undefined")
+    return { collapsed: false, closedGroups: [] };
+  try {
+    const saved = JSON.parse(
+      window.localStorage.getItem(preferencesKey) ?? "null",
+    );
+    if (
+      saved &&
+      typeof saved.collapsed === "boolean" &&
+      Array.isArray(saved.closedGroups)
+    ) {
+      return {
+        collapsed: saved.collapsed,
+        closedGroups: menuGroups
+          .filter((group) => saved.closedGroups.includes(group.id))
+          .map((group) => group.id),
+      };
+    }
+  } catch {
+    // Use the expanded menu if browser storage is unavailable or invalid.
+  }
+  return { collapsed: false, closedGroups: [] };
+}
+
 export function AppSidebar() {
   const pathname = usePathname();
+  const { locale, t } = useLocale();
   const [role, setRole] = useState("staff");
   const [userName, setUserName] = useState("Người dùng");
-  const [userRole, setUserRole] = useState("User");
   const [preferences, setPreferences] = useState<SidebarPreferences>({
     collapsed: false,
     closedGroups: [],
   });
   useEffect(() => {
-    try {
-      const saved = JSON.parse(
-        window.localStorage.getItem(preferencesKey) ?? "null",
-      );
-      if (
-        saved &&
-        typeof saved.collapsed === "boolean" &&
-        Array.isArray(saved.closedGroups)
-      ) {
-        setPreferences({
-          collapsed: saved.collapsed,
-          closedGroups: menuGroups
-            .filter((group) => saved.closedGroups.includes(group.id))
-            .map((group) => group.id),
-        });
+    const initializationTimer = window.setTimeout(() => {
+      setPreferences(loadPreferences());
+      const user = getStoredUser();
+      setRole(user?.role?.toLowerCase() ?? "staff");
+      setUserName(user?.name ?? "Người dùng");
+      if (user?.id) {
+        void api
+          .get<{ name: string }>(`/users/${user.id}`)
+          .then((profile) => setUserName(profile.name))
+          .catch(() => undefined);
       }
-    } catch {
-      // Use the expanded menu if browser storage is unavailable or invalid.
-    }
-    const user = getStoredUser();
-    setRole(user?.role?.toLowerCase() ?? "staff");
-    setUserName(user?.name ?? "Người dùng");
-    setUserRole(
-      (
-        {
-          admin: "Admin",
-          manager: "Trưởng khoa",
-          leader: "Trưởng nhóm",
-          viewer: "Chỉ xem",
-          staff: "Nhân viên",
-        } as Record<string, string>
-      )[user?.role?.toLowerCase() ?? ""] ?? "Người dùng",
-    );
-    if (user?.id) {
-      void api
-        .get<{ name: string }>(`/users/${user.id}`)
-        .then((profile) => setUserName(profile.name))
-        .catch(() => undefined);
-    }
+    }, 0);
+    return () => window.clearTimeout(initializationTimer);
   }, []);
+  const userRole =
+    role === "manager"
+      ? locale === "en" ? "Department manager" : "Trưởng khoa"
+      : role === "leader"
+        ? locale === "en" ? "Team leader" : "Trưởng nhóm"
+        : role === "viewer"
+          ? locale === "en" ? "Read-only" : "Chỉ xem"
+          : role === "staff"
+            ? locale === "en" ? "Staff" : "Nhân viên"
+            : "Admin";
   const visibleItems = menuItems.filter((item) =>
     canAccessRoute(role, item.key),
   );
@@ -144,7 +171,7 @@ export function AppSidebar() {
   return (
     <aside
       className={`sidebar-panel${preferences.collapsed ? " is-collapsed" : ""}`}
-      aria-label="Menu chính"
+      aria-label={t("sidebar.menu")}
     >
       <div className="sidebar-brand-row">
         <button
@@ -158,21 +185,21 @@ export function AppSidebar() {
           }
           aria-label={
             preferences.collapsed
-              ? "Mở rộng menu HuuNghi CareOps"
-              : "Thu gọn menu HuuNghi CareOps"
+              ? `${t("sidebar.expand")} menu HuuNghi CareOps`
+              : `${t("sidebar.collapse")} menu HuuNghi CareOps`
           }
           aria-expanded={!preferences.collapsed}
           aria-controls="sidebar-navigation"
           title={
             preferences.collapsed
-              ? "Bấm để mở rộng menu"
-              : "Bấm để thu gọn menu"
+              ? t("sidebar.expandMenu")
+              : t("sidebar.collapseMenu")
           }
         >
           <Image
             className="brand-logo"
             src="/hospital-logo.png"
-            alt="Logo bệnh viện"
+            alt={t("sidebar.logo")}
             width={42}
             height={42}
             priority
@@ -181,7 +208,7 @@ export function AppSidebar() {
             <span className="brand-name">
               HuuNghi <span>CareOps</span>
             </span>
-            <span className="brand-subtitle">Điều phối vận hành</span>
+            <span className="brand-subtitle">{t("sidebar.operations")}</span>
           </span>
         </button>
       </div>
@@ -189,7 +216,7 @@ export function AppSidebar() {
       <div className="sidebar-scroll" id="sidebar-navigation">
         <nav
           className="sidebar-menu"
-          aria-label="Điều hướng không gian làm việc"
+          aria-label={t("sidebar.navigation")}
         >
           {menuGroups.map((group) => {
             const items = visibleItems.filter((item) =>
@@ -211,8 +238,8 @@ export function AppSidebar() {
                   className="sidebar-group-title"
                   aria-expanded={isOpen}
                   aria-controls={`sidebar-group-${group.id}`}
-                  title={group.label}
-                  aria-label={`${isOpen ? "Thu gọn" : "Mở rộng"} nhóm ${group.label}`}
+                  title={t(group.id === "work" ? "group.work" : "group.management")}
+                  aria-label={`${t(isOpen ? "sidebar.collapse" : "sidebar.expand")} ${t(group.id === "work" ? "group.work" : "group.management")}`}
                   onClick={() =>
                     savePreferences({
                       collapsed: false,
@@ -226,7 +253,7 @@ export function AppSidebar() {
                   }
                 >
                   <group.icon aria-hidden="true" />
-                  <span>{group.label}</span>
+                  <span>{t(group.id === "work" ? "group.work" : "group.management")}</span>
                   <DownOutlined
                     className={`sidebar-group-chevron${isOpen ? " is-open" : ""}`}
                     aria-hidden="true"
@@ -248,14 +275,14 @@ export function AppSidebar() {
                         href={item.key}
                         className={`sidebar-item ${isActive ? "active" : ""}`}
                         aria-current={isActive ? "page" : undefined}
-                        aria-label={item.label}
-                        title={item.label}
+                        aria-label={t(menuTranslationKeys[item.key])}
+                        title={t(menuTranslationKeys[item.key])}
                       >
                         <item.icon
                           className="sidebar-nav-icon"
                           aria-hidden="true"
                         />
-                        <span className="sidebar-item-label">{item.label}</span>
+                        <span className="sidebar-item-label">{t(menuTranslationKeys[item.key])}</span>
                         {isActive ? (
                           <span
                             className="sidebar-active-dot"
@@ -275,8 +302,8 @@ export function AppSidebar() {
       <Link
         href="/account"
         className="sidebar-usercard"
-        title={`Xem hồ sơ: ${userName} · ${userRole}`}
-        aria-label={`Xem hồ sơ tài khoản ${userName}`}
+        title={`${locale === "en" ? "View profile" : "Xem hồ sơ"}: ${userName} · ${userRole}`}
+        aria-label={`${locale === "en" ? "View account profile" : "Xem hồ sơ tài khoản"} ${userName}`}
       >
         <div className="user-avatar">
           {userName
@@ -288,7 +315,7 @@ export function AppSidebar() {
             .toUpperCase()}
         </div>
         <div className="sidebar-user-info">
-          <div className="user-name">{userName}</div>
+          <div className="user-name" data-i18n-skip>{userName}</div>
           <div className="user-role">{userRole}</div>
         </div>
         <span className="user-icon">◎</span>

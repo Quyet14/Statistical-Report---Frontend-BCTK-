@@ -24,10 +24,18 @@
 .workflow-template-form p { color: #6b7b8c; font-size: 13px; }
 .workflow-audit { padding: 22px; }
 .workflow-audit article { display: flex; gap: 14px; padding: 12px 0 20px; border-bottom: 1px solid #eaf0f5; }
+.workflow-audit-content { flex: 1; min-width: 0; }
+.workflow-audit-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.workflow-audit-heading time { flex-shrink: 0; }
 .workflow-audit article p { margin: 10px 0; color: #526784; }
 .workflow-audit time { color: #8291a7; font-size: 12px; }
 .workflow-audit details { margin-top: 12px; color: #58728f; font-size: 13px; }
 .workflow-audit pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f4f7fb; padding: 12px; border-radius: 9px; }
+.workflow-audit-changes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 10px; max-width: 900px; margin: 10px 0 0; padding: 0; list-style: none; }
+.workflow-audit-changes li { display: grid; gap: 6px; min-width: 0; padding: 12px; border: 1px solid #e3ebf4; border-radius: 10px; background: #f8fafd; }
+.workflow-audit-changes li > span { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; color: #718198; overflow-wrap: anywhere; }
+.workflow-audit-changes li b { color: #284b70; }
+.workflow-audit-no-changes { color: #8291a7 !important; }
 .workflow-audit-dot,.notification-center-dot { width: 11px; height: 11px; border-radius: 50%; background: #6489cc; flex-shrink: 0; margin-top: 8px; box-shadow: 0 0 0 5px #6388cc14; }
 .workflow-inline-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-top: 15px; }
 .workflow-inline-actions label { flex: 1; display: grid; gap: 6px; font-size: 13px; }

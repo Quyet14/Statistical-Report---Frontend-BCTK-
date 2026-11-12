@@ -50,8 +50,7 @@ export default function NotificationsPage() {
           <span className="eyebrow">Theo dõi & nhắc việc</span>
           <h3 className="page-title">Trung tâm thông báo</h3>
           <p className="page-description">
-            {items.filter((item) => !item.readAt).length} chưa đọc · Các nhắc
-            việc gần nhất trong phạm vi tài khoản của bạn.
+            {items.filter((item) => !item.readAt).length} chưa đọc
           </p>
         </div>
         <label className="soft-select">

@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { TaskItem } from "@/types";
 import { getStoredUser } from "@/lib/auth";
 import { useTasks } from "@/context/TaskContext";
+import { useLocale } from "@/i18n/locale-provider";
 export function TaskWorkflowPanel({
   task,
   readOnly = false,
@@ -11,6 +12,7 @@ export function TaskWorkflowPanel({
   readOnly?: boolean;
 }) {
   const { reviewTask } = useTasks();
+  const { t } = useLocale();
   const user = getStoredUser();
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -19,10 +21,10 @@ export function TaskWorkflowPanel({
   const currentStep = task.approvalSteps?.findIndex(step => step.reviewerId === task.reviewerId && step.state !== "approved") ?? -1;
   const hasNextStep = currentStep >= 0 && currentStep < (task.approvalSteps?.length ?? 0) - 1;
   const labels = {
-    draft: "Cần người duyệt xác nhận",
-    submitted: "Chờ duyệt · Đã khóa chỉnh sửa",
-    approved: "Đã duyệt · Checklist đã khóa",
-    rejected: "Bị từ chối · Cần bổ sung",
+    draft: t("workflow.draft"),
+    submitted: t("workflow.submitted"),
+    approved: t("workflow.approved"),
+    rejected: t("workflow.rejected"),
   };
   async function act(action: "submit" | "approve" | "reject" | "reopen") {
     if (busy) return;
@@ -36,9 +38,9 @@ export function TaskWorkflowPanel({
   return (
     <div className={`task-workflow-state ${task.approvalState ?? "draft"}`}>
       <strong>{labels[task.approvalState ?? "draft"]}</strong>
-      {task.delegatedReview ? <p>Bạn đang duyệt theo ủy quyền còn hiệu lực. Nhật ký sẽ ghi người thực hiện duyệt thay.</p> : null}
-      {task.isParticipant ? <p>Bạn đang phối hợp thực hiện; người phụ trách chính sẽ gửi duyệt.</p> : null}
-      {task.approvalSteps?.length ? <ol className="task-approval-summary">{task.approvalSteps.map(step=><li key={step.position}>Cấp {step.position} · {step.reviewerName??`Tài khoản #${step.reviewerId}`} · {step.state==="approved"?"Đã duyệt":step.state==="rejected"?"Cần bổ sung":"Chờ duyệt"}</li>)}</ol> : null}
+      {task.delegatedReview ? <p>{t("workflow.delegated")}</p> : null}
+      {task.isParticipant ? <p>{t("workflow.participant")}</p> : null}
+      {task.approvalSteps?.length ? <ol className="task-approval-summary">{task.approvalSteps.map(step=><li key={step.position}>{t("workflow.level")} {step.position} · {step.reviewerName??`Tài khoản #${step.reviewerId}`} · {step.state==="approved"?t("workflow.approvedShort"):step.state==="rejected"?t("workflow.needsChanges"):t("workflow.awaitingReview")}</li>)}</ol> : null}
       {task.rejectionReason ? <p>Lý do: {task.rejectionReason}</p> : null}
       {!isReadOnly && task.assigneeId === user?.id && task.progress === 100 && !task.locked ? (
         <button
@@ -55,13 +57,13 @@ export function TaskWorkflowPanel({
       task.approvalState === "submitted" ? (
         <div className="workflow-inline-actions">
           <label>
-            Lý do nếu từ chối
+            {t("workflow.reason")}
             <input
               className="auth-input"
               value={reason}
               maxLength={1000}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="Nội dung cần bổ sung…"
+              placeholder={t("workflow.additionalContent")}
             />
           </label>
           <button
@@ -70,7 +72,7 @@ export function TaskWorkflowPanel({
             disabled={busy}
             onClick={() => void act("approve")}
           >
-            {hasNextStep ? `Duyệt cấp ${currentStep + 1}` : "Duyệt hoàn thành"}
+            {hasNextStep ? `${t("workflow.approveLevel")} ${currentStep + 1}` : t("workflow.approveComplete")}
           </button>
           <button
             type="button"
@@ -78,7 +80,7 @@ export function TaskWorkflowPanel({
             disabled={busy || reason.trim().length < 3}
             onClick={() => void act("reject")}
           >
-            Từ chối
+            {t("workflow.reject")}
           </button>
         </div>
       ) : null}
@@ -90,7 +92,7 @@ export function TaskWorkflowPanel({
           disabled={busy}
           onClick={() => void act("reopen")}
         >
-          Mở khóa để chỉnh sửa
+          {t("workflow.reopen")}
         </button>
       ) : null}
     </div>

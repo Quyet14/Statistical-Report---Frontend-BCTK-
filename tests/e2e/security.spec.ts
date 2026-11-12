@@ -30,6 +30,31 @@ async function signIn(page: Page, remember = false) {
 }
 test.beforeEach(async ({ request }) => { await request.get('http://127.0.0.1:3025/__test/reset'); });
 
+test('surface and button motion responds to interaction and respects reduced motion', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await openOtp(page);
+  const orbit = page.locator('.otp-security-mark');
+  await expect(orbit).toBeVisible();
+  expect(await orbit.evaluate(element => getComputedStyle(element, '::before').animationName)).toBe('otp-orbit');
+  await page.locator('input[autocomplete=one-time-code]').fill('123456');
+  await page.locator('.auth-primary').click();
+  await expect(page).toHaveURL(/\/checklist$/);
+  const card = page.locator('.stat-card').first();
+  await card.hover();
+  await expect(card).toHaveClass(/surface-active/);
+  await expect.poll(() => card.evaluate(element => getComputedStyle(element).transform)).not.toBe('none');
+  const action = page.locator('.topbar .primary-action').first();
+  await action.hover();
+  await expect.poll(() => action.evaluate(element => getComputedStyle(element).transform)).not.toBe('none');
+  await page.screenshot({ path: 'test-results/qa-motion-dashboard.png', fullPage: true });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await card.hover();
+  await expect(card).not.toHaveClass(/surface-active/);
+  await expect.poll(() => card.evaluate(element => getComputedStyle(element).transform)).toBe('none');
+  await action.hover();
+  await expect.poll(() => action.evaluate(element => getComputedStyle(element).transform)).toBe('none');
+});
+
 test('custom report designer saves column order, previews data and creates a disabled delivery schedule',async({page,request})=>{
  await request.get('http://127.0.0.1:3025/__test/admin');let saved:any=null;const schedules:any[]=[];const columnLabels={title:'Công việc',assignee:'Người thực hiện',department:'Khoa/phòng',dueDate:'Hạn thực hiện',progress:'Tiến độ (%)',status:'Trạng thái'};
  await page.route('**/api/reports/builder/**',route=>{const path=new URL(route.request().url()).pathname,method=route.request().method();if(path.endsWith('/capabilities'))return route.fulfill({json:{enabled:true}});if(path.endsWith('/templates')&&method==='POST'){saved={...route.request().postDataJSON(),id:1,version:1,active:true};return route.fulfill({json:{id:1}});}if(path.endsWith('/templates'))return route.fulfill({json:{items:saved?[saved]:[],columns:columnLabels}});if(path.endsWith('/schedules')&&method==='POST'){const body=route.request().postDataJSON();expect(body.active).toBe(false);schedules.push({...body,id:1,version:1,title:saved.title,nextRun:'2026-12-01T07:00:00'});return route.fulfill({json:{id:1}});}if(path.endsWith('/schedules'))return route.fulfill({json:{items:schedules,people:[{id:1,name:'Admin fixture'}],jobs:[],deliveryEnabled:true}});if(path.endsWith('/preview'))return route.fulfill({json:{columns:saved.config.columns.map((key:string)=>({key,label:columnLabels[key as keyof typeof columnLabels]})),rows:[{title:'Scoped report fixture',assignee:'Staff fixture',department:'A',dueDate:'2026-11-05',progress:50,status:'doing'}],total:1,page:1,pageSize:100,bounds:{start:'2026-11-01',end:'2026-11-30'}}});return route.fulfill({status:404,json:{message:'Unexpected fixture route'}});});
@@ -112,6 +137,106 @@ test('galaxy background animates in depth, can pause and remembers the visual pr
   await page.screenshot({path:'test-results/galaxy-dashboard-mobile.png',fullPage:true});
   await page.locator('.galaxy-control').click(); await expect(page.locator('.galaxy-backdrop')).toHaveClass(/galaxy-off/);
   await expect(heroCanvas).toBeHidden();
+});
+
+test('activity journal explains task changes without showing raw data', async ({ page }) => {
+  await page.route('**/api/work/activity*', route => route.fulfill({
+    json: {
+      items: [{
+        id: 501,
+        actorName: 'Admin fixture',
+        action: 'update',
+        summary: 'Phần Mềm',
+        createdAt: '2026-11-04T16:44:37+07:00',
+        beforeData: { status: 'done', progress: 100 },
+        afterData: { status: 'todo', progress: 0 },
+      }],
+      total: 1,
+      page: 1,
+      limit: 25,
+    },
+  }));
+  await signIn(page);
+  await page.goto('/workflow');
+  await page.getByRole('tab', { name: 'Nhật ký', exact: true }).click();
+
+  const entry = page.locator('.workflow-audit article');
+  await expect(entry).toContainText('Admin fixture');
+  await expect(entry).toContainText('Cập nhật');
+  await expect(entry).toContainText('Phần Mềm');
+  await entry.getByText('Xem thay đổi', { exact: true }).click();
+  await expect(entry.locator('.workflow-audit-changes')).toContainText('Hoàn thành');
+  await expect(entry.locator('.workflow-audit-changes')).toContainText('Chưa làm');
+  await expect(entry.getByText('Dữ liệu kỹ thuật', { exact: true })).toHaveCount(0);
+  await expect(entry.locator('pre')).toHaveCount(0);
+});
+
+test('checklist period selection stays selected when it has no matching tasks', async ({ page }) => {
+  await page.route('**/api/tasks', route => route.fulfill({
+    json: [{
+      id: 1001,
+      title: 'Công việc ngoài khoảng đã chọn',
+      assignee: 'Nhân viên thử nghiệm',
+      assigneeId: 3,
+      createdById: 2,
+      departmentId: 10,
+      departmentName: 'Khoa thử nghiệm',
+      status: 'todo',
+      progress: 0,
+      priority: 'medium',
+      dueDate: '2000-01-01',
+      checklist: [],
+    }],
+  }));
+  await signIn(page);
+
+  const period = page.getByRole('combobox', { name: 'Chọn khoảng thời gian' });
+  await period.selectOption('today');
+  await expect(period).toHaveValue('today');
+  await expect(page.locator('.board-summary')).toContainText('0 công việc');
+
+  await period.selectOption('week');
+  await expect(period).toHaveValue('week');
+  await expect(page.locator('.board-summary')).toContainText('0 công việc');
+
+  await period.selectOption('all');
+  await expect(period).toHaveValue('all');
+  await expect(page.getByText('Công việc ngoài khoảng đã chọn', { exact: true })).toBeVisible();
+});
+
+test('page titles integrate with page content instead of sitting in a separate card', async ({ page }) => {
+  await signIn(page);
+  await page.goto('/tasks');
+  const header = page.locator('.dashboard-page > .page-header');
+  await expect(header).toBeVisible();
+  const styles = await header.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      backgroundImage: style.backgroundImage,
+      backdropFilter: style.backdropFilter,
+      borderRadius: style.borderRadius,
+      boxShadow: style.boxShadow,
+      bottomBorder: style.borderBottomWidth,
+      titleAccent: getComputedStyle(element.querySelector('.page-title')!, '::before').width,
+      titleColor: getComputedStyle(element.querySelector('.page-title')!).color,
+      titleWeight: getComputedStyle(element.querySelector('.page-title')!).fontWeight,
+      eyebrowDisplay: getComputedStyle(element.querySelector('.eyebrow')!).display,
+      headingLayout: getComputedStyle(element.querySelector(':scope > div:first-child')!).display,
+      galaxyActive: !!document.querySelector('.galaxy-backdrop:not(.galaxy-off)'),
+    };
+  });
+  expect(styles.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+  expect(styles.backgroundImage).toBe('none');
+  expect(styles.backdropFilter).toBe('none');
+  expect(styles.borderRadius).toBe('0px');
+  expect(styles.boxShadow).toBe('none');
+  expect(styles.bottomBorder).toBe('1px');
+  expect(styles.titleAccent).toBe('3px');
+  expect(styles.titleWeight).toBe('800');
+  expect(styles.eyebrowDisplay).toBe('none');
+  expect(styles.headingLayout).toBe('flex');
+  expect(styles.titleColor).toBe(styles.galaxyActive ? 'rgb(244, 249, 255)' : 'rgb(21, 54, 83)');
 });
 
 test('menu navigation preserves the shell and galaxy yields to interaction', async ({ page, request }) => {
@@ -345,7 +470,7 @@ test('reviewer approves a locked submission and the work journal records the act
   await expect(page.getByText('Đã duyệt · Checklist đã khóa', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Đóng', exact: true }).click();
   await page.getByRole('tab', { name: 'Nhật ký', exact: true }).click();
-  await expect(page.getByText('approve', { exact: true })).toBeVisible();
+  await expect(page.locator('.workflow-audit article').first().locator('.workflow-state')).toHaveText('Đã duyệt');
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/work-audit-mobile.png', fullPage: true });

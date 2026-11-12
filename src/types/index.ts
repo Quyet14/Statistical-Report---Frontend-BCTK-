@@ -4,6 +4,7 @@ export type TaskPriority = "Low" | "Medium" | "High";
 export interface TaskItem {
   id: string;
   title: string;
+  titleEn?: string | null;
   description?: string;
   assignee: string;
   assigneeId?: number;
@@ -27,6 +28,7 @@ export interface TaskItem {
   checklist?: {
     id: number;
     title: string;
+    titleEn?: string | null;
     completed: boolean;
     fieldType?: "tick" | "number" | "signature";
     numberValue?: number | null;

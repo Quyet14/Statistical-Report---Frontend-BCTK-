@@ -1,0 +1,150 @@
+/* Shared, lightweight interaction layer. No animated filters or perpetual motion. */
+.pull-refresh-container { overscroll-behavior-y: contain; }
+.pull-refresh-anchor { position: sticky; top: 0; height: 0; z-index: 35; pointer-events: none; }
+.pull-refresh-indicator { position: absolute; left: 50%; top: 8px; display: flex; align-items: center; gap: 9px; padding: 10px 16px; border: 1px solid #cbdbee; border-radius: 24px; background: #fff; color: #365995; box-shadow: 0 5px 18px #102e4c2b; font-size: 13px; font-weight: 650; white-space: nowrap; visibility: hidden; }
+.pull-refresh-indicator[data-active="true"] { visibility: visible; }
+.pull-refresh-indicator.is-refreshing svg { animation: pull-refresh-spin 800ms linear infinite; }
+@keyframes pull-refresh-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pull-refresh-indicator.is-refreshing svg { animation: none; } }
+@media print { .pull-refresh-anchor { display: none; } }
+.modal-backdrop:has(> .task-modal) { padding: 16px; overflow: hidden; }
+.task-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(600px, 100%);
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: hidden;
+}
+.task-modal .task-modal-header { flex: 0 0 auto; margin: 0; padding: 18px 22px; border-bottom: 1px solid #e0e7f1; }
+.task-modal .task-form { display: flex; flex-direction: column; min-height: 0; overflow: hidden; gap: 0; }
+.task-form-fields { display: grid; gap: 14px; padding: 18px 22px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.task-modal .task-modal-actions { flex: 0 0 auto; margin: 0; padding: 14px 22px; border-top: 1px solid #e0e7f1; background: #fff; }
+@media (max-width: 520px) {
+  .task-modal .task-modal-header, .task-form-fields, .task-modal .task-modal-actions { padding: 14px; }
+  .task-modal .task-form-row { grid-template-columns: minmax(0, 1fr); }
+}
+
+:root {
+  --action-top: #3b65cc;
+  --action-bottom: #4e58be;
+  --action-edge: #35479b;
+  --action-ring: #80a7f0;
+}
+
+:is(.dashboard-shell, .auth-page) :is(.primary-action, .secondary-action, .auth-primary, .auth-secondary, .ant-btn-primary, .ant-btn-default) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  border-radius: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background-color 140ms ease;
+}
+
+:is(.dashboard-shell, .auth-page) :is(.primary-action, .auth-primary, .ant-btn-primary) {
+  color: #fff;
+  background: linear-gradient(135deg, var(--action-top), var(--action-bottom));
+  border: 1px solid #526bc5;
+  box-shadow: inset 0 1px 0 #ffffff52, 0 3px 0 var(--action-edge), 0 6px 12px #243f8524;
+}
+
+:is(.dashboard-shell, .auth-page) :is(.secondary-action, .auth-secondary, .ant-btn-default) {
+  color: #365376;
+  background: linear-gradient(180deg, #fff, #f1f5fc);
+  border: 1px solid #cad7e7;
+  box-shadow: inset 0 1px 0 #fff, 0 2px 0 #d2dce9, 0 4px 9px #1c375010;
+}
+
+:is(.dashboard-shell, .auth-page) :is(.primary-action, .secondary-action, .auth-primary, .auth-secondary, .ant-btn):focus-visible {
+  outline: 3px solid var(--action-ring);
+  outline-offset: 4px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :is(.dashboard-shell, .auth-page) :is(.primary-action, .auth-primary, .ant-btn-primary):not(:disabled):not([aria-disabled="true"]):hover {
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: inset 0 1px 0 #ffffff66, 0 4px 0 var(--action-edge), 0 9px 17px #243f8530;
+  }
+
+  :is(.dashboard-shell, .auth-page) :is(.secondary-action, .auth-secondary, .ant-btn-default):not(:disabled):not([aria-disabled="true"]):hover {
+    color: #254da2;
+    border-color: #9db8e5;
+    transform: translateY(-1px);
+    box-shadow: inset 0 1px 0 #fff, 0 3px 0 #c8d6e9, 0 7px 12px #1c375018;
+  }
+}
+
+:is(.dashboard-shell, .auth-page) :is(.primary-action, .auth-primary, .ant-btn-primary):not(:disabled):not([aria-disabled="true"]):active {
+  transform: translateY(2px);
+  box-shadow: inset 0 2px 4px #1928521a, 0 1px 0 var(--action-edge);
+}
+
+:is(.dashboard-shell, .auth-page) :is(.secondary-action, .auth-secondary, .ant-btn-default):not(:disabled):not([aria-disabled="true"]):active {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 4px #19395812;
+}
+
+:is(.dashboard-shell, .auth-page) :is(.primary-action, .secondary-action, .auth-primary, .auth-secondary, .ant-btn):is(:disabled, [aria-disabled="true"]) {
+  color: #7c8b9f;
+  background: #eaf0f6;
+  border-color: #d8e1ec;
+  box-shadow: none;
+  transform: none;
+  cursor: not-allowed;
+}
+
+.dashboard-shell .ant-btn-dangerous {
+  --action-top: #bf4456;
+  --action-bottom: #b23d50;
+  --action-edge: #922e3d;
+}
+.dashboard-shell .ant-btn-dangerous.ant-btn-default { color: #ae3549; border-color: #ebc3ca; background: #fff5f6; }
+.dashboard-shell .ant-btn-dangerous.ant-btn-primary { border-color: #b23d50; }
+
+.dashboard-shell :is(.workflow-tabs, .hospital-tabs, .programs-tabs) {
+  padding: 5px;
+  gap: 5px;
+  box-shadow: inset 0 1px 3px #20385708;
+}
+.dashboard-shell :is(.workflow-tabs, .hospital-tabs, .programs-tabs) button {
+  min-height: 38px;
+  border-radius: 9px;
+  transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+.dashboard-shell :is(.workflow-tabs, .hospital-tabs, .programs-tabs) button:is(.active, .is-active, .is-selected, [aria-selected="true"]) {
+  color: #fff;
+  background: linear-gradient(135deg, #376ec9, #4e5db9);
+  box-shadow: inset 0 1px #ffffff3d, 0 2px 5px #253f8626;
+}
+
+.dashboard-shell .dashboard-surfaces :is(.surface-card, .panel-card) {
+  box-shadow: inset 0 1px 0 #ffffffb3, 0 2px 3px #17365304, 0 8px 22px -12px #122d5640;
+}
+.dashboard-shell .programs-heading { padding: 16px 20px; border-radius: 14px; }
+.dashboard-shell .programs-heading h1 { font-size: clamp(22px, 2vw, 28px); margin: 0; }
+.dashboard-shell .page-header .page-description { margin: 4px 0 0; font-size: 13px; }
+.dashboard-shell:has(.galaxy-backdrop:not(.galaxy-off)) .dashboard-surfaces .dashboard-page > .page-header .page-description { color: #d2e2f4; }
+
+@media (max-width: 700px) {
+  .dashboard-shell .programs-heading { padding: 14px; flex-wrap: wrap; }
+  .dashboard-shell :is(.primary-action, .secondary-action) { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.dashboard-shell, .auth-page) :is(.primary-action, .secondary-action, .auth-primary, .auth-secondary, .ant-btn, .workflow-tabs button, .hospital-tabs button, .programs-tabs button) {
+    transition: none;
+    transform: none !important;
+  }
+}
+
+@media print {
+  .dashboard-shell :is(.surface-card, .panel-card, .primary-action, .secondary-action) { box-shadow: none; }
+}

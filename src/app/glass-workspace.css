@@ -1,0 +1,110 @@
+/* Frosted surfaces, restrained motion and readable clinical operations data. */
+:root {
+  --action-top: #6251d5;
+  --action-bottom: #7042c1;
+  --action-edge: #48339b;
+  --action-ring: #ad9bea;
+  --glass-line: #dcd9ed;
+  --glass-ink: #28354e;
+}
+
+.auth-page, .auth-panel {
+  background: radial-gradient(ellipse at 8% 15%, #ece7ff, transparent 55%), radial-gradient(ellipse at 95% 85%, #f8e9f3, transparent 50%), #f7f7fc;
+}
+.auth-aside { background: radial-gradient(ellipse at 15% 20%, #635dc944, transparent 60%), linear-gradient(145deg, #172339, #31335a 70%, #3f3865); }
+.auth-card { border-radius: 28px; border: 1px solid #fff; background: linear-gradient(145deg, #fffffff5, #fafaffed); box-shadow: inset 0 1px #fff, 0 2px 6px #362c6a06, 0 24px 65px -30px #47347842; }
+.auth-card h1 { color: #283149; letter-spacing: -.035em; }
+.auth-brand { color: #62528e; }
+.auth-card-subtitle { color: #637087; font-size: 14px; }
+.auth-card-subtitle strong { color: #44376e; }
+.auth-card .auth-input { background-color: #fcfbff; border-color: #d9d6e9; border-radius: 12px; }
+.auth-card .auth-input:focus { border-color: #8872cd; box-shadow: 0 0 0 4px #8b72d21c; }
+.auth-card[data-auth-step="otp"] { width: min(100%, 460px); padding: 34px; }
+.auth-card[data-auth-step="otp"] .auth-card-header { gap: 8px; margin-bottom: 26px; }
+.auth-card[data-auth-step="otp"] h1 { font-size: clamp(25px, 3vw, 30px); margin: 8px 0 2px; }
+.auth-card[data-auth-step="otp"] .auth-form { gap: 18px; }
+.otp-security-mark { position: relative; display: grid; place-items: center; width: 76px; height: 76px; margin: 3px auto 12px; border: 1px solid #e2dcf6; border-radius: 25px; color: #6d51b6; background: linear-gradient(145deg, #f8f5ff, #e9e5fb); box-shadow: inset 0 2px 0 #fff, 0 7px 0 #dfd8f44d, 0 14px 24px #6a4fb51a; }
+.otp-security-mark::before { content: ""; position: absolute; inset: -6px; border: 1px solid #b7a7df5c; border-left-color: transparent; border-bottom-color: transparent; border-radius: 30px; }
+.auth-card .otp-fields { gap: clamp(6px, 1.4vw, 10px); }
+.auth-card .otp-fields .otp-digit { height: 60px; border: 2px solid transparent; border-radius: 14px; color: #3c315d; background: linear-gradient(#fff, #faf8ff) padding-box, linear-gradient(135deg, #b5a5dc, #dbd3ef, #a1b6df) border-box; box-shadow: 0 3px 0 #e5dff240, 0 5px 12px #5142850c; font-weight: 750; }
+.auth-card .otp-fields .otp-digit:focus { border-color: #8062c4; box-shadow: 0 0 0 4px #9474d61a, 0 4px 10px #61509516; }
+.auth-card .otp-fields .otp-digit:focus-visible { outline: 3px solid #b8a3e8; outline-offset: 2px; }
+.auth-card .auth-step-note { margin: 0; font-size: 12px; line-height: 1.6; color: #68738b; }
+.auth-loading-spinner { flex: 0 0 16px; width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: auth-submit-spin 700ms linear infinite; }
+.auth-page .auth-primary:disabled:has(.auth-loading-spinner) { color: #fff; background: linear-gradient(135deg, var(--action-top), var(--action-bottom)); border-color: var(--action-bottom); box-shadow: 0 5px 16px #5943a429; cursor: wait; }
+@keyframes auth-submit-spin { to { transform: rotate(360deg); } }
+
+:is(.dashboard-shell, .auth-page) :is(.primary-action, .auth-primary, .ant-btn-primary) { border-radius: 13px; box-shadow: inset 0 1px #ffffff38, 0 2px 0 var(--action-edge), 0 7px 18px #5943a429; }
+:is(.dashboard-shell, .auth-page) :is(.primary-action, .auth-primary, .ant-btn-primary):not(:disabled):not([aria-disabled="true"]):hover { box-shadow: inset 0 1px #ffffff50, 0 3px 0 var(--action-edge), 0 10px 22px #5943a436; }
+:is(.dashboard-shell, .auth-page) :is(.secondary-action, .auth-secondary, .ant-btn-default) { border-radius: 13px; border-color: #dcd8eb; background: linear-gradient(180deg, #fff, #f7f6fc); color: #4d5070; }
+
+.dashboard-shell .sidebar-panel { background: linear-gradient(160deg, #fafafff5, #f1f3faf5); border-right-color: #dedfec; box-shadow: 5px 0 22px #17112d0b; backdrop-filter: none; }
+.dashboard-shell .sidebar-group-title { border-radius: 12px; background: #eaeaf480; color: #575e7c; }
+.dashboard-shell .sidebar-item { border-radius: 13px; }
+.dashboard-shell .sidebar-item.active { background: linear-gradient(120deg, #5962bd, #7151bc); border-color: #8279cf; color: #fff; box-shadow: inset 0 1px #ffffff36, 0 4px 12px #4d3f8726; }
+.dashboard-shell .sidebar-item.active .sidebar-nav-icon { color: #fff; border-color: #ffffff40; background: #ffffff1c; }
+.dashboard-shell .topbar { border-color: #e1dff0; background: linear-gradient(115deg, #fbfafff2, #f4f4fcf0); backdrop-filter: blur(10px); }
+.dashboard-shell .dashboard-main .dashboard-surfaces :is(.surface-card, .panel-card, .programs-card, .table-card) { border: 1px solid var(--glass-line); border-radius: 18px; color: var(--glass-ink); background: linear-gradient(140deg, #ffffffed, #f6f6fdf0); box-shadow: inset 0 1px #ffffff, 0 2px 4px #33284904, 0 12px 28px -18px #30275044; }
+.dashboard-shell .dashboard-main .dashboard-surfaces .stat-card { border: 1px solid #dedbee; border-radius: 18px; background: linear-gradient(135deg, #fffffff5, #f3f1fcf0); box-shadow: inset 0 1px #fff, 0 3px 4px #33284904, 0 10px 24px -16px #30275040; }
+.dashboard-shell .stat-card .stat-icon { border-radius: 11px; border: 1px solid #ffffffb3; background: #ffffffa6; box-shadow: 0 3px 9px #3027500d; }
+.dashboard-shell .stat-card .stat-label { font-size: 14px; font-weight: 650; color: #53617b; }
+.dashboard-shell .stat-card .stat-value { letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.dashboard-shell .modern-table th { padding: 13px 16px; font-size: 13px; background: #eeedf7; color: #525879; border-color: #e3e1ef; }
+.dashboard-shell .modern-table td { padding: 13px 16px; border-color: #e9e7f2; color: #43516b; }
+.dashboard-shell .modern-table tbody tr:hover { background: #eeebfa8a; }
+.dashboard-shell .table-scroll { border-radius: 13px; }
+.dashboard-shell .dashboard-surfaces :is(.workflow-tabs, .hospital-tabs, .programs-tabs, .toggle-group) { background: #f0eff7ef; border-color: #dddaea; border-radius: 14px; }
+.dashboard-shell :is(.workflow-tabs, .hospital-tabs, .programs-tabs) button:is(.active, .is-active, .is-selected, [aria-selected="true"]) { background: linear-gradient(125deg, #5d62be, #7052ba); box-shadow: inset 0 1px #ffffff38, 0 3px 8px #55439821; }
+.dashboard-shell .toggle-btn.active { background: #fff; color: #6152a3; box-shadow: 0 2px 6px #564b7f14; }
+.dashboard-shell .task-modal { border: 1px solid #e1dced; border-radius: 24px; box-shadow: inset 0 1px #fff, 0 24px 60px #14102438; }
+.dashboard-shell .task-modal-header, .dashboard-shell .task-modal-actions { background: #fbfaff; border-color: #e6e1f0; }
+.dashboard-shell .dashboard-surfaces :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea):focus-visible { outline: 3px solid #9474d628; outline-offset: 1px; border-color: #9d89cd; }
+.dashboard-shell .task-card { border-radius: 17px; }
+.dashboard-shell .dashboard-page[data-page="checklist"] .kanban-column { border-radius: 20px; }
+.dashboard-shell .dashboard-page[data-page="checklist"] .task-card-header .task-title { color: #353f62; }
+.dashboard-shell .programs-heading { background: linear-gradient(120deg, #fffffff2, #f1edfbee); border-color: var(--glass-line); }
+.dashboard-shell .dashboard-surfaces .detail-hero { background: linear-gradient(120deg, #fffffff2, #f0eefbef); border-color: var(--glass-line); }
+
+@media (min-width: 1300px) {
+  .dashboard-shell .workspace-masthead .topbar { flex-wrap: nowrap; }
+  .dashboard-shell .workspace-masthead .topbar-title-group { flex: 0 1 260px; min-width: 190px; }
+  .dashboard-shell .workspace-masthead .topbar-actions { flex: 1 1 auto; flex-wrap: nowrap; gap: 8px; }
+  .dashboard-shell .workspace-masthead .search-box { flex: 1 1 220px; min-width: 180px; max-width: 300px; width: auto; }
+  .dashboard-shell .user-chip > span:last-child { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dashboard-shell .locale-switcher > span:first-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+}
+@media (max-width: 900px) {
+  .auth-page { grid-template-columns: minmax(0, 1fr); }
+  .auth-aside { display: none; }
+  .auth-panel { min-height: 100dvh; padding: 24px 16px; }
+}
+@media (max-width: 700px) {
+  .dashboard-shell .topbar { backdrop-filter: none; }
+  .dashboard-shell .dashboard-main .dashboard-surfaces :is(.surface-card, .panel-card, .programs-card, .table-card, .stat-card) { border-radius: 15px; }
+  .auth-card[data-auth-step="otp"] { padding: 26px 20px; border-radius: 24px; }
+  .auth-card .otp-fields .otp-digit { height: 56px; font-size: 25px; }
+}
+/* Animate only the surface being used. No permanent animation on dashboard cards. */
+@media (prefers-reduced-motion: no-preference) {
+  .auth-card { animation: workspace-arrive 480ms cubic-bezier(.2,.8,.2,1) both; }
+  .otp-security-mark::before { animation: otp-orbit 8s linear infinite; }
+  .auth-card .otp-fields .otp-digit { transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease; }
+  .auth-card .otp-fields .otp-digit:focus { transform: translateY(-4px); }
+  :is(.dashboard-shell, .auth-page) :is(.primary-action, .auth-primary, .ant-btn-primary, .secondary-action, .auth-secondary, .ant-btn-default) {
+    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  }
+  :is(.dashboard-shell, .auth-page) :is(.primary-action, .auth-primary, .ant-btn-primary, .secondary-action, .auth-secondary, .ant-btn-default):not(:disabled):not([aria-disabled="true"]):active { transform: translateY(2px) scale(.98); }
+  .dashboard-shell .sidebar-item { transition: transform 180ms ease, background-color 180ms ease, box-shadow 180ms ease; }
+  @keyframes workspace-arrive { from { opacity: .3; transform: translateY(18px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @keyframes otp-orbit { to { transform: rotate(360deg); } }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  :is(.dashboard-shell, .auth-page) :is(.primary-action, .auth-primary, .ant-btn-primary):not(:disabled):not([aria-disabled="true"]):hover:not(:active) { transform: translateY(-3px); box-shadow: inset 0 1px #ffffff70, 0 4px 0 var(--action-edge), 0 14px 26px #6951c84d; }
+  :is(.dashboard-shell, .auth-page) :is(.secondary-action, .auth-secondary, .ant-btn-default):not(:disabled):not([aria-disabled="true"]):hover:not(:active) { transform: translateY(-2px); border-color: #aaa0d3; box-shadow: 0 7px 15px #58478624; }
+  .dashboard-shell .sidebar-item:not(.active):hover { transform: translateX(4px); background: #e9e5f8; box-shadow: inset 3px 0 #8b75d1; }
+  .dashboard-shell .dashboard-main .dashboard-surfaces :is(.stat-card, .task-card).surface-active { transform: perspective(1000px) translateY(-6px) rotateX(var(--surface-rx, 0deg)) rotateY(var(--surface-ry, 0deg)); border-color: #a799d7; box-shadow: inset 0 1px #fff, 0 4px 0 #d7cfea, 0 20px 32px -12px #4d397b55; }
+}
+@media (prefers-reduced-motion: reduce) { .auth-loading-spinner { animation: none; } }
+@media print {
+  .dashboard-shell .dashboard-surfaces :is(.surface-card, .panel-card, .programs-card, .table-card, .stat-card) { background: #fff !important; box-shadow: none !important; }
+}

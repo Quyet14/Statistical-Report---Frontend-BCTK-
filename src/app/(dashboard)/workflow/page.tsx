@@ -11,6 +11,7 @@ import { TaskCollaborationPanel } from "@/components/checklist/TaskCollaboration
 import Link from "next/link";
 import { formatTaskDate } from "@/lib/presentation";
 import type { TaskItem } from "@/types";
+import { useLocale } from "@/i18n/locale-provider";
 type Person = { id: number; name: string; role?: string; departmentId?: number | null };
 type Template = {
   id: number;
@@ -61,8 +62,62 @@ const stateLabels: Record<string, string> = {
   doing: "Đang làm",
   done: "Hoàn thành",
 };
+const auditActions: Record<string, string> = {
+  create: "Tạo công việc",
+  update: "Cập nhật",
+  approve: "Đã duyệt",
+  reject: "Yêu cầu bổ sung",
+  submit: "Gửi duyệt",
+  reopen: "Mở lại",
+  restore: "Khôi phục",
+  delete: "Chuyển vào thùng rác",
+  "checklist.update": "Cập nhật checklist",
+  "checklist.add": "Thêm mục checklist",
+  "review.configure": "Thay đổi người duyệt",
+};
+const auditFields: Record<string, string> = {
+  status: "Trạng thái",
+  progress: "Tiến độ",
+  title: "Tên công việc",
+  titleEn: "Tên tiếng Anh",
+  assigneeId: "Mã người thực hiện",
+  reviewerId: "Mã người duyệt",
+  dueDate: "Hạn hoàn thành",
+  priority: "Mức ưu tiên",
+  isRecurring: "Công việc lặp lại",
+  completed: "Checklist hoàn tất",
+  numberValue: "Giá trị",
+  signedById: "Mã người xác nhận",
+  source: "Nguồn cập nhật",
+  approvalState: "Trạng thái duyệt",
+  reason: "Lý do",
+  delegatedFor: "Ủy quyền cho",
+};
+const auditRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+const auditValue = (key: string, value: unknown, locale: string) => {
+  if (value == null || value === "") return locale === "en" ? "Not set" : "Chưa đặt";
+  if (key === "status" || key === "approvalState")
+    return stateLabels[String(value)] ?? String(value);
+  if (key === "progress") return `${value}%`;
+  if (key === "priority") {
+    const priorities: Record<string, string> = {
+      low: "Thấp",
+      medium: "Trung bình",
+      high: "Cao",
+    };
+    return priorities[String(value).toLowerCase()] ?? String(value);
+  }
+  if (key === "dueDate") return formatTaskDate(String(value));
+  if (typeof value === "boolean") return value ? "Có" : "Không";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+};
 export default function WorkflowPage() {
   const user = getStoredUser();
+  const { locale } = useLocale();
   const [, startTransition] = useTransition();
   const manage = !!user && ["admin","manager","leader"].includes(user.role);
   const manageTemplates = !!user && ["admin", "manager"].includes(user.role);
@@ -485,20 +540,50 @@ export default function WorkflowPage() {
           {audit.map((event) => (
             <article key={event.id}>
               <span className="workflow-audit-dot" />
-              <div>
-                <strong>{event.actorName}</strong>{" "}
-                <span className="workflow-state">{event.action}</span>
-                <p>{event.summary}</p>
-                <time>{new Date(event.createdAt).toLocaleString("vi-VN")}</time>
+              <div className="workflow-audit-content">
+                <header className="workflow-audit-heading">
+                  <div>
+                    <strong>{event.actorName}</strong>{" "}
+                    <span className="workflow-state">
+                      {auditActions[event.action] ?? event.action}
+                    </span>
+                  </div>
+                  <time>
+                    {new Date(event.createdAt).toLocaleString(
+                      locale === "en" ? "en-US" : "vi-VN",
+                    )}
+                  </time>
+                </header>
+                <p>
+                  <span>{locale === "en" ? "Task:" : "Công việc:"}</span>{" "}
+                  <strong>{event.summary || (locale === "en" ? "Untitled task" : "Công việc không tên")}</strong>
+                </p>
                 <details>
                   <summary>Xem thay đổi</summary>
-                  <pre>
-                    {JSON.stringify(
-                      { truoc: event.beforeData, sau: event.afterData },
-                      null,
-                      2,
-                    )}
-                  </pre>
+                  {(() => {
+                    const before = auditRecord(event.beforeData);
+                    const after = auditRecord(event.afterData);
+                    const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])]
+                      .filter((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]));
+                    return keys.length ? (
+                      <ul className="workflow-audit-changes">
+                        {keys.map((key) => (
+                          <li key={key}>
+                            <strong>{auditFields[key] ?? key}</strong>
+                            <span>
+                              {auditValue(key, before[key], locale)}{" "}
+                              <span aria-label={locale === "en" ? "changed to" : "thành"}>→</span>{" "}
+                              <b>{auditValue(key, after[key], locale)}</b>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="workflow-audit-no-changes">
+                        {locale === "en" ? "No field details were recorded." : "Không có chi tiết trường dữ liệu được ghi lại."}
+                      </p>
+                    );
+                  })()}
                 </details>
               </div>
             </article>

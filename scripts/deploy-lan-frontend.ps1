@@ -23,10 +23,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Build failed. The running LAN release was not changed.' }
     if (!(Test-Path -LiteralPath (Join-Path $frontendRoot "$build/BUILD_ID"))) { throw 'Build is incomplete; LAN unchanged.' }
     try {
-        & $servicesScript -Action stop
+        & $servicesScript -Action stop -Service frontend
+        & $servicesScript -Action preflight -Service frontend
         & $node $selector "--build=$build"
         if ($LASTEXITCODE -ne 0) { throw 'Could not select the completed build.' }
-        & $servicesScript -Action start
+        & $servicesScript -Action start -Service frontend
         $ready = $false
         for ($attempt = 0; $attempt -lt 12; $attempt++) {
             & $node (Join-Path $PSScriptRoot 'check-lan.cjs')
@@ -39,9 +40,9 @@ try {
     } catch {
         $deploymentError = $_
         Write-Warning 'Deployment failed; restoring the previous frontend selection.'
-        & $servicesScript -Action stop
+        & $servicesScript -Action stop -Service frontend
         [IO.File]::WriteAllText($settingsPath, $previousSettings, [Text.UTF8Encoding]::new($false))
-        & $servicesScript -Action start
+        & $servicesScript -Action start -Service frontend
         throw $deploymentError
     }
 } finally {

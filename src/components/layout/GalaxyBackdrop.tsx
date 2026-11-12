@@ -81,12 +81,15 @@ const TILT = 0.4;
 
 /* Ring bands: [start, end, density, brightness]. Gaps between them stay dark. */
 const BANDS: [number, number, number, number, number][] = [
-  [0.22, 0.63, 0.2, 0.9, 1], // smooth glowing inner disc: only a few fine specks
-  [0.65, 0.99, 1.7, 0.9, 3], // dark lined rings: many tiny bright specks
-  [1.0, 1.04, 0.15, 1.0, 2], // thin glowing ring
-  [1.08, 1.22, 1.0, 0.6, 4], // grainy outer belt
+  [0.22, 0.68, 0.2, 0.9, 1], // smooth glowing inner disc: only a few fine specks
+  [0.72, 0.9, 1.9, 0.9, 3], // wide dark ring: many tiny bright specks
+  [0.925, 0.945, 0.2, 1.0, 2], // the glowing line
+  [1.0, 1.13, 1.2, 0.6, 4], // chunky outer belt
 ];
 const BAND_TOTAL = BANDS.reduce((s, b) => s + b[2], 0);
+
+/* Concentric lanes in the dark ring: 1 = a lane crowded with white specks, 0 = a black lane */
+const laneAt = (r: number) => 0.5 + 0.5 * Math.sin(r * 150 + 1.8 * Math.sin(r * 31) + 0.4);
 
 /* Each radial zone of the rings spins at its own rate (inner faster, like real orbits) */
 const ZONE_SPIN = [1.6, 0.8, 0.5];
@@ -117,7 +120,10 @@ function makeParticles(ringCount: number, dustCount: number): Particle[] {
       }
       pick -= b[2];
     }
-    const r = band[0] + rnd(i * 5.3 + 1) * (band[1] - band[0]);
+    let r = band[0] + rnd(i * 5.3 + 1) * (band[1] - band[0]);
+    if (band[4] === 3) {
+      for (let t = 1; t < 6 && laneAt(r) < 0.45; t++) r = band[0] + rnd(i * 5.3 + 1 + t * 17.3) * (band[1] - band[0]);
+    }
     const c = rnd(i * 11.7 + 4);
     let kind = 0;
     if (c < 0.03) kind = 2;
@@ -138,7 +144,7 @@ function makeParticles(ringCount: number, dustCount: number): Particle[] {
   }
   for (let i = 0; i < dustCount; i++) {
     const k = i + 9000;
-    const r = 0.3 + Math.pow(rnd(k * 3.3), 1.4) * 1.2;
+    const r = 0.3 + Math.pow(rnd(k * 3.3), 1.4) * 0.85;
     const c = rnd(k * 6.1);
     list.push({
       r,
@@ -152,9 +158,9 @@ function makeParticles(ringCount: number, dustCount: number): Particle[] {
     });
   }
   // grainy outer belt: dense blue speckles with a ragged, fading edge
-  for (let i = 0; i < 3000; i++) {
+  for (let i = 0; i < 9000; i++) {
     const k = i + 20000;
-    const r = 1.12 + Math.pow(rnd(k * 2.3), 1.7) * 0.3;
+    const r = 1.0 + Math.pow(rnd(k * 2.3), 1.7) * 0.15;
     const c = rnd(k * 6.7);
     list.push({
       r,
@@ -167,13 +173,14 @@ function makeParticles(ringCount: number, dustCount: number): Particle[] {
       dust: false,
     });
   }
+  list.sort((a, b) => a.kind - b.kind); // grouped by colour: far fewer fillStyle changes per frame
   return list;
 }
 
 /* Dust plumes streaming away from the disc along its minor axis */
 type Plume = { u: number; dir: number; p0: number; size: number; kind: number; tw: number; speed: number };
 function makePlumes(count: number): Plume[] {
-  return Array.from({ length: count }, (_, i) => {
+  const list = Array.from({ length: count }, (_, i) => {
     const c = rnd(i * 6.6 + 3);
     return {
       u: (rnd(i * 5.1) + rnd(i * 7.3 + 2) + rnd(i * 9.7 + 4) - 1.5) * 0.2,
@@ -185,6 +192,39 @@ function makePlumes(count: number): Plume[] {
       speed: 0.6 + rnd(i * 1.9 + 7) * 0.8,
     };
   });
+  list.sort((a, b) => a.kind - b.kind);
+  return list;
+}
+
+/* ---------- golden orbits around the planet: tilted ellipses of glittering gold dust ---------- */
+type GoldOrbit = { a: number; e: number; phi: number; theta: number; spin: number; prec: number; dir: number };
+const GOLD_ORBITS: GoldOrbit[] = [
+  { a: 2.1, e: 0.55, phi: -0.35, theta: 1.05, spin: 0.00052, prec: 0.00004, dir: 1 },
+  { a: 2.6, e: 0.4, phi: 1.1, theta: 1.2, spin: 0.00042, prec: -0.00003, dir: -1 },
+  { a: 3.2, e: 0.62, phi: 2.2, theta: 0.8, spin: 0.00035, prec: 0.00002, dir: 1 },
+  { a: 3.8, e: 0.32, phi: -1.2, theta: 1.4, spin: 0.00058, prec: -0.00004, dir: -1 },
+];
+const GOLD_RGB = ["255,205,80", "255,226,140", "255,240,190", "255,170,40"];
+const GOLD_FILL = GOLD_RGB.map((c) => `rgb(${c})`);
+type GoldDot = { orbit: number; u: number; off: number; size: number; tw: number; kind: number; big: boolean };
+function makeGold(perOrbit: number): GoldDot[] {
+  const list: GoldDot[] = [];
+  GOLD_ORBITS.forEach((_, o) => {
+    for (let i = 0; i < perOrbit; i++) {
+      const h = o * 5000 + i * 3.7;
+      const c = rnd(h + 4);
+      list.push({
+        orbit: o,
+        u: (i + (rnd(h + 1) - 0.5) * 0.8) / perOrbit,
+        off: (rnd(h + 2) + rnd(h + 3) - 1) * 0.1,
+        size: 0.7 + Math.pow(rnd(h + 5), 2.0) * 1.8,
+        tw: rnd(h + 6) * TAU,
+        kind: c < 0.45 ? 0 : c < 0.75 ? 1 : c < 0.9 ? 2 : 3,
+        big: i % 11 === 0 || rnd(h + 8) < 0.02,
+      });
+    }
+  });
+  return list;
 }
 
 type Star = { x: number; y: number; size: number; tw: number; live: boolean };
@@ -238,6 +278,8 @@ function fbm(x: number, y: number, period: number) {
   return v;
 }
 const EARTH_SEA = 0.53;
+/* "blue": smooth glossy blue planet (as in the reference picture). "earth": continents and clouds. */
+const PLANET_STYLE = "earth" as "blue" | "earth";
 type EarthTex = {
   height: Uint8Array;
   relief: Uint8Array;
@@ -330,7 +372,7 @@ function makeInfall(count: number): Infall[] {
       tw: rnd(i * 9.1) * TAU,
       kind: c < 0.5 ? 3 : c < 0.72 ? 1 : c < 0.9 ? 0 : c < 0.96 ? 2 : 5,
       speed: 0.6 + rnd(i * 1.3 + 4) * 0.9,
-      trail: rnd(i * 2.9 + 8) < 0.2,
+      trail: rnd(i * 2.9 + 8) < 0.3,
       big: i % 47 === 0,
       z: (rnd(i * 3.3 + 6) - 0.5) * 0.08,
     };
@@ -349,7 +391,7 @@ type World = {
   glow: string;
 };
 const WORLDS: World[] = [
-  { x0: 0.16, y0: 0.2, r: 19, vx: 3.4, vy: 0.9, kind: "gas", c: ["#f6dcae", "#c98a4b", "#5e3418"], glow: "255,190,120" },
+  { x0: 0.16, y0: 0.2, r: 16, vx: 3.4, vy: 0.9, kind: "gas", c: ["#f6dcae", "#c98a4b", "#5e3418"], glow: "255,190,120" },
   { x0: 0.06, y0: 0.74, r: 9, vx: 2.3, vy: -0.5, kind: "ice", c: ["#f4fcff", "#9ad1ff", "#32608f"], glow: "150,210,255" },
   { x0: 0.64, y0: 0.1, r: 7, vx: -2.7, vy: 1.1, kind: "rock", c: ["#ffbf9c", "#c2573a", "#44190f"], glow: "255,140,100" },
   { x0: 0.4, y0: 0.88, r: 12, vx: 2.9, vy: -1.2, kind: "ringed", c: ["#c8f4de", "#4fae93", "#123f38"], glow: "120,230,190" },
@@ -379,8 +421,8 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
     let nextComet = 2500;
     let comets: Comet[] = [];
 
-    const particles = makeParticles(hero ? 3200 : 4000, hero ? 500 : 700);
-    const plumes = makePlumes(hero ? 1500 : 2400);
+    const particles = makeParticles(hero ? 8500 : 10500, hero ? 1400 : 1900);
+    const plumes = makePlumes(hero ? 2600 : 4200);
     const infall = makeInfall(hero ? 650 : 950);
     const im = infall.length;
     const ix = new Float32Array(im);
@@ -390,6 +432,52 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
     const isz = new Float32Array(im);
     const ial = new Float32Array(im);
     const ids = new Float32Array(im);
+    const gold = makeGold(hero ? 420 : 700);
+    const goldN = gold.length;
+    const gX = new Float32Array(goldN);
+    const gY = new Float32Array(goldN);
+    const gZ = new Float32Array(goldN);
+    const gA = new Float32Array(goldN);
+    const goldSprite = document.createElement("canvas"); // soft golden glow used for the big bokeh dots
+    goldSprite.width = 64;
+    goldSprite.height = 64;
+    {
+      const sc = goldSprite.getContext("2d");
+      if (sc) {
+        const gr = sc.createRadialGradient(32, 32, 0, 32, 32, 32);
+        gr.addColorStop(0, "rgba(255,246,205,1)");
+        gr.addColorStop(0.25, "rgba(255,210,100,0.8)");
+        gr.addColorStop(0.55, "rgba(255,172,40,0.35)");
+        gr.addColorStop(1, "rgba(255,150,30,0)");
+        sc.fillStyle = gr;
+        sc.fillRect(0, 0, 64, 64);
+      }
+    }
+    /* quality governor: 1 = everything; lower values draw a random subset of the specks (see rank arrays) */
+    const lowEnd = (navigator.hardwareConcurrency || 8) <= 4 || window.matchMedia("(pointer: coarse)").matches;
+    let quality = lowEnd ? 0.7 : 1;
+    let frameCost = 8; // smoothed milliseconds spent in draw()
+    let adaptTick = 0;
+    let fps60 = false;
+    const makeGlow = (rgb: string) => {
+      const cv = document.createElement("canvas");
+      cv.width = 48;
+      cv.height = 48;
+      const gc = cv.getContext("2d");
+      if (gc) {
+        const gr = gc.createRadialGradient(24, 24, 0, 24, 24, 24);
+        gr.addColorStop(0, `rgba(${rgb},0.95)`);
+        gr.addColorStop(1, `rgba(${rgb},0)`);
+        gc.fillStyle = gr;
+        gc.fillRect(0, 0, 48, 48);
+      }
+      return cv;
+    };
+    const glowWhite = makeGlow("225,245,255");
+    const glowGold = makeGlow("255,214,130");
+    const glowBlue = makeGlow("140,200,255");
+    const grank = gold.map((d) => d.tw / TAU);
+    const prankPlume = plumes.map((p) => p.tw / TAU);
     const glint = particles.map((p, i) => !p.dust && (p.kind === 1 || p.kind === 3) && i % 61 === 0);
     const stars = makeStars(170);
     const n = particles.length;
@@ -398,6 +486,10 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
     const ss = new Float32Array(n);
     const al = new Float32Array(n);
     const ds = new Float32Array(n);
+    const prank = new Float32Array(n);
+    for (let i = 0; i < n; i++) prank[i] = rnd(i * 1.7 + 0.3);
+    const pkind = new Uint8Array(n);
+    for (let i = 0; i < n; i++) pkind[i] = particles[i].kind;
     const bg = document.createElement("canvas"); // baked faint glow + static stars
 
     function layout() {
@@ -451,6 +543,64 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
     let pPole = new Float32Array(0);
     let pSpec = new Float32Array(0);
     let pRingBand = new Float32Array(0);
+    let curDpr = 1;
+    let planetTurns = -9; // rotation at the last render of the planet bitmap
+
+    /* The two dust plumes hold thousands of tiny specks that drift very slowly, so their body is drawn into
+       two bitmaps (even / odd specks), each rebuilt a few times a second; only the sparkles are drawn live. */
+    const plumeCv: HTMLCanvasElement[] = [document.createElement("canvas"), document.createElement("canvas")];
+    const plumeDirty = [true, true];
+    let plumeNext = 0;
+    let plumeLast = -1e9;
+    let plumeR = 0;
+    let plumeK = 1;
+    const plumeOx = () => plumeR * 0.62;
+    const plumeOy = () => plumeR * 1.8;
+
+    function ensurePlumeCache(R: number, dpr: number) {
+      const k = Math.min(dpr, 1.25);
+      if (Math.abs(R - plumeR) < 0.5 && k === plumeK && plumeCv[0].width > 1) return;
+      plumeR = R;
+      plumeK = k;
+      for (const cv of plumeCv) {
+        cv.width = Math.ceil(R * 1.24 * k);
+        cv.height = Math.ceil(R * 3.6 * k);
+      }
+      plumeDirty[0] = plumeDirty[1] = true;
+    }
+
+    function renderPlumeHalf(h: number, t: number, R: number, sk: number) {
+      const cv = plumeCv[h];
+      const c = cv.getContext("2d");
+      if (!c) return;
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.clearRect(0, 0, cv.width, cv.height);
+      c.setTransform(plumeK, 0, 0, plumeK, plumeOx() * plumeK, plumeOy() * plumeK);
+      c.globalCompositeOperation = "lighter";
+      let lastKind = -1;
+      for (let pi = h; pi < plumes.length; pi += 2) {
+        if (prankPlume[pi] > quality) continue;
+        const p = plumes[pi];
+        const f = (p.p0 + t * 0.000018 * p.speed) % 1;
+        const fade = Math.sin(f * Math.PI);
+        if (fade <= 0.02) continue;
+        const x = p.u * (0.7 + f) * R + Math.sin(t * 0.0012 + p.tw) * R * 0.015;
+        const y = p.dir * (0.45 + f * 1.25) * R;
+        const tw2 = Math.sin(t * 0.004 + p.tw);
+        c.globalAlpha = Math.min(1, fade * (0.35 + 0.7 * tw2 * tw2 + 0.1));
+        if (p.kind !== lastKind) {
+          c.fillStyle = COLORS[p.kind];
+          lastKind = p.kind;
+        }
+        const sz = p.size * (1.25 - f * 0.4) * sk;
+        if (sz < 1.5) c.fillRect(x - sz, y - sz, sz * 2, sz * 2);
+        else {
+          c.beginPath();
+          c.arc(x, y, sz, 0, TAU);
+          c.fill();
+        }
+      }
+    }
 
     function bakePlanet(dpr: number) {
       const kk = Math.min(dpr, 1.5);
@@ -475,8 +625,8 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
       pPole = new Float32Array(total);
       pSpec = new Float32Array(total);
       pRingBand = new Float32Array(total);
-      const lx = -0.45;
-      const ly = -0.55;
+      const lx = -0.5;
+      const ly = 0.5;
       const lz = 0.7;
       const ll = Math.hypot(lx, ly, lz);
       const Lx = lx / ll;
@@ -500,14 +650,14 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
             const nz = Math.sqrt(Math.max(0, 1 - Math.min(1, nx * nx + ny * ny)));
             const diffuse = Math.max(0, nx * Lx + ny * Ly + nz * Lz);
             pAlpha[i] = Math.min(1, Math.max(0, (Rp - dist) / 1.4 + 0.5));
-            pShade[i] = (0.24 + 0.98 * Math.pow(diffuse, 0.72)) * (0.92 + 0.08 * nz);
+            pShade[i] = (0.05 + 1.05 * Math.pow(diffuse, 0.85)) * (0.88 + 0.12 * nz);
             const lit = (nx * Lx + ny * Ly) * 0.5 + 0.5;
             pRim[i] = Math.pow(1 - nz, 3.2) * (0.15 + 0.85 * Math.min(1, Math.max(0, lit)));
             pLon[i] = Math.atan2(nx, nz);
             const lat = Math.asin(Math.max(-1, Math.min(1, ny)));
             pRow[i] = Math.floor((lat / Math.PI + 0.5) * (TEX_H - 1)) * TEX_W;
             pPole[i] = Math.abs(lat) / (Math.PI / 2);
-            pRingBand[i] = smooth(0, 1, 1 - Math.abs(lat - 0.36) / 0.2);
+            pRingBand[i] = smooth(0, 1, 1 - Math.abs(lat - 0.34) / 0.075);
             const hd = Math.max(0, (nx * Hx + ny * Hy + nz * Hz) / hl);
             pSpec[i] = Math.pow(hd, 60) * 0.3 + Math.pow(hd, 10) * 0.05;
             idx.push(i);
@@ -522,6 +672,7 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
         }
       }
       pIdx = Uint32Array.from(idx);
+      planetTurns = -9;
     }
 
     function renderPlanet(turns: number) {
@@ -539,6 +690,23 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
           data[o + 3] = pRim[i] * 255;
           continue;
         }
+        if (PLANET_STYLE === "blue") {
+          let ub = pLon[i] / TAU + 0.5 + turns * 0.8;
+          ub -= Math.floor(ub);
+          const lat01 = row / TEX_W / (TEX_H - 1);
+          const cvn = sampleU(cloud, row, ub) / 255;
+          const hn = sampleU(height, row, ub) / 255;
+          const band = 0.5 + 0.5 * Math.sin(lat01 * TAU * 2.4 + hn * 3.4 + cvn * 1.8);
+          const litb = Math.min(1, Math.max(0, (pShade[i] - 0.22) / 0.85));
+          const swirl = (0.3 * band + 0.7 * cvn) * litb;
+          const rimb = Math.pow(pRim[i], 1.2);
+          const spb = pSpec[i] * 0.9;
+          data[o] = Math.min(255, 5 + 34 * litb + 84 * swirl + 185 * rimb + 200 * spb);
+          data[o + 1] = Math.min(255, 32 + 104 * litb + 92 * swirl + 222 * rimb + 220 * spb);
+          data[o + 2] = Math.min(255, 116 + 112 * litb + 40 * swirl + 255 * rimb + 240 * spb);
+          data[o + 3] = pAlpha[i] * 255;
+          continue;
+        }
         let u = pLon[i] / TAU + 0.5 + turns;
         u -= Math.floor(u);
         let uc = pLon[i] / TAU + 0.5 + turns * 1.3 + 0.37; // clouds drift a little faster
@@ -552,17 +720,17 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
 
         // ocean: deep navy, turquoise only in shallow water near coasts
         const shallow = smooth(0.9, 1.0, Math.min(1, h / EARTH_SEA));
-        const oR = 14 + 10 * mo + 40 * shallow;
-        const oG = 82 + 24 * mo + 95 * shallow;
-        const oB = 176 + 30 * mo + 50 * shallow;
+        const oR = 8 + 8 * mo + 34 * shallow;
+        const oG = 40 + 22 * mo + 90 * shallow;
+        const oB = 110 + 30 * mo + 70 * shallow;
 
         // land: muted greens, tans, rock and snow
         const t = Math.max(0, (h - EARTH_SEA) / (1 - EARTH_SEA));
         const arid = Math.max(0, 1 - Math.abs(pole - 0.28) / 0.15) * 0.35;
         const green = smooth(0.3, 0.55, mo - arid);
-        let lr = 192 + (74 - 192) * green;
-        let lg = 162 + (140 - 162) * green;
-        let lb = 112 + (62 - 112) * green;
+        let lr = 172 + (56 - 172) * green;
+        let lg = 146 + (86 - 146) * green;
+        let lb = 102 + (44 - 102) * green;
         const tundra = smooth(0.6, 0.8, pole) * 0.7;
         lr += (128 - lr) * tundra;
         lg += (124 - lg) * tundra;
@@ -591,10 +759,11 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
         b += (248 - b) * ice;
 
         const sh = pShade[i];
-        const shadow = (1 - 0.38 * cshadow * (1 - cv)) * (1 - 0.26 * pRingBand[i]); // cloud + ring shadows
-        let sr = r * sh * shadow;
-        let sg = gg * sh * shadow;
-        let sb = b * sh * shadow;
+        const shadow = (1 - 0.38 * cshadow * (1 - cv)) * (1 - 0.5 * pRingBand[i]); // cloud + ring shadows
+        const gain = 1.4; // brighter globe
+        let sr = r * sh * shadow * gain;
+        let sg = gg * sh * shadow * gain;
+        let sb = b * sh * shadow * (gain + 0.15);
         if (lw < 0.5 && ice < 0.5) {
           const sp = pSpec[i] * (1 - cv) * (1 - lw * 2) * 0.8; // sun glint on the sea
           sr += 255 * sp;
@@ -613,10 +782,10 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
         sg += (cs - sg) * cv;
         sb += (cs * 1.02 - sb) * cv;
         const lum = sr * 0.3 + sg * 0.55 + sb * 0.15;
-        sr = (lum + (sr - lum) * 1.1) * 1.12;
-        sg = (lum + (sg - lum) * 1.1) * 1.12;
-        sb = (lum + (sb - lum) * 1.1) * 1.12;
-        const haze = pRim[i] * 1.35; // thin atmosphere on the lit limb
+        sr = lum + (sr - lum) * 0.9;
+        sg = lum + (sg - lum) * 0.9;
+        sb = lum + (sb - lum) * 0.9;
+        const haze = pRim[i] * 0.9; // thin atmosphere on the lit limb
         data[o] = Math.min(255, sr + 84 * haze);
         data[o + 1] = Math.min(255, sg + 150 * haze);
         data[o + 2] = Math.min(255, sb + 255 * haze);
@@ -626,6 +795,67 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
     }
 
     const ringTex: (HTMLCanvasElement | null)[] = [null, null, null];
+    let lightDark: HTMLCanvasElement | null = null;
+    let lightGlow: HTMLCanvasElement | null = null;
+
+    function bakeLight(k: number, size: number, R: number, coreR: number) {
+      lightDark = lightDark ?? document.createElement("canvas");
+      lightGlow = lightGlow ?? document.createElement("canvas");
+      for (const cv of [lightDark, lightGlow]) {
+        cv.width = size;
+        cv.height = size;
+      }
+      const d = lightDark.getContext("2d");
+      const w = lightGlow.getContext("2d");
+      if (!d || !w) return;
+      d.translate(size / 2, size / 2);
+      d.scale(k, k);
+      w.translate(size / 2, size / 2);
+      w.scale(k, k);
+      // shadow cast by the planet across the rings, pointing away from the light
+      d.save();
+      d.rotate(0.15);
+      const shLen = R * 1.5;
+      const shW = coreR * 0.95;
+      for (let q = 0; q < 10; q++) {
+        const a = 0.2 * Math.pow(1 - q / 10, 0.8);
+        const sg = d.createLinearGradient(0, -shW * 1.25, 0, shW * 1.25);
+        sg.addColorStop(0, "rgba(1,4,16,0)");
+        sg.addColorStop(0.22, `rgba(1,4,16,${a})`);
+        sg.addColorStop(0.78, `rgba(1,4,16,${a})`);
+        sg.addColorStop(1, "rgba(1,4,16,0)");
+        d.fillStyle = sg;
+        d.fillRect((q / 10) * shLen, -shW * 1.25, shLen / 10 + 1, shW * 2.5);
+      }
+      d.restore();
+      if (typeof d.createConicGradient === "function") {
+        const cg = d.createConicGradient(0, 0, 0);
+        const lg = w.createConicGradient(0, 0, 0);
+        const lg2 = w.createConicGradient(0, 0, 0);
+        for (let q = 0; q <= 36; q++) {
+          const a = (q / 36) * TAU;
+          cg.addColorStop(q / 36, `rgba(1,4,18,${(Math.pow(Math.max(0, Math.cos(a)), 1.3) * 0.16).toFixed(3)})`);
+          const lobe = Math.pow(Math.max(0, Math.cos(a - Math.PI)), 2.4);
+          lg.addColorStop(q / 36, `rgba(90,190,255,${(0.05 * lobe).toFixed(3)})`);
+          lg2.addColorStop(q / 36, `rgba(225,246,255,${(0.08 * lobe).toFixed(3)})`);
+        }
+        d.strokeStyle = cg;
+        d.lineWidth = R * 1.1;
+        d.beginPath();
+        d.arc(0, 0, R * 0.85, 0, TAU);
+        d.stroke();
+        w.strokeStyle = lg;
+        w.lineWidth = R * 0.44;
+        w.beginPath();
+        w.arc(0, 0, R * 0.42, 0, TAU);
+        w.stroke();
+        w.strokeStyle = lg2;
+        w.lineWidth = R * 0.1;
+        w.beginPath();
+        w.arc(0, 0, R * 0.99, 0, TAU);
+        w.stroke();
+      }
+    }
     let texHalf = 0;
 
     function bakeRings(dpr: number) {
@@ -633,7 +863,7 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
       const k = Math.min(dpr, 1.25);
       texHalf = R * 1.4;
       const size = Math.ceil(texHalf * 2 * k);
-      // zone 0: smooth glowing disc · zone 1: dark lined rings + glowing line · zone 2: grainy belt
+      bakeLight(k, size, R, coreOf(R));
       const zones: [number, number][] = [
         [0.2, 0.64],
         [0.64, 1.08],
@@ -669,18 +899,11 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
           c.fillStyle = col;
           c.fillRect(Math.cos(a) * R * r, Math.sin(a) * R * r, sz, sz);
         };
-        // 1-D value noise (not periodic in practice) used to make gaps and lanes irregular
         const n1 = (x: number) => vnoise(x, 0.5, 1e6);
-        // organic density profile: 0 = dark gap, 1 = dense lane
-        const prof = (r: number) => {
-          const v = 0.55 * n1(r * 70 + zi * 13.7) + 0.3 * n1(r * 190 + 17.3) + 0.15 * n1(r * 420 + 5.1);
-          return Math.min(1, Math.max(0, (v - 0.27) * 2.3));
-        };
         const softStreak = (r: number, a0: number, len: number, w: number, rgb: string, al: number) => {
           streak(r, a0, len, w * 3.2, rgb, al * 0.22);
           streak(r, a0, len, w, rgb, al);
         };
-        // a streak that fades out at both ends: three nested arcs, longest faintest
         const streak = (r: number, a0: number, len: number, w: number, rgb: string, al: number) => {
           for (let k = 0; k < 3; k++) {
             const f = 1 - k * 0.32;
@@ -691,148 +914,239 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
           }
         };
 
+        const wander = (r: number, a0: number, len: number, w: number, rgb: string, al: number, amp: number, ph: number) => {
+          const steps = Math.max(8, Math.ceil(len * 16));
+          const slope = (rnd(ph + 9) - 0.5) * amp * 1.4;
+          const pt = (t: number): [number, number] => {
+            const a = a0 + len * t;
+            const rr = r + amp * (n1(t * 2.4 + ph * 0.37) - 0.5) * 2 + slope * (t - 0.5);
+            return [Math.cos(a) * R * rr, Math.sin(a) * R * rr];
+          };
+          for (let pass = 0; pass < 3; pass++) {
+            const t0 = pass * 0.12;
+            const t1 = 1 - pass * 0.12;
+            c.strokeStyle = `rgba(${rgb},${al * (0.3 + pass * 0.35)})`;
+            c.lineWidth = w * (1.5 - pass * 0.4);
+            c.beginPath();
+            for (let i = 0; i <= steps; i++) {
+              const [x, y] = pt(t0 + (t1 - t0) * (i / steps));
+              if (i === 0) c.moveTo(x, y);
+              else c.lineTo(x, y);
+            }
+            c.stroke();
+          }
+        };
+
         if (zi === 0) {
-          // smooth, silky bands: cyan glow against the planet, then azure / royal blue / light blue
-          ringGradient(0.2, 0.64, [
-            [0, "rgba(170,236,255,0.96)"],
-            [0.09, "rgba(75,190,255,0.96)"],
-            [0.22, "rgba(55,160,255,0.96)"],
-            [0.34, "rgba(24,98,238,0.96)"],
-            [0.46, "rgba(70,170,255,0.97)"],
-            [0.56, "rgba(105,205,255,0.97)"],
-            [0.68, "rgba(20,84,225,0.96)"],
-            [0.8, "rgba(40,135,250,0.96)"],
-            [0.92, "rgba(12,58,190,0.95)"],
-            [1, "rgba(8,40,150,0.94)"],
+          ringGradient(0, 0.2, [
+        [0, "rgba(190,242,255,0.97)"],
+        [1, "rgba(170,236,255,0.96)"],
+      ]);
+      ringGradient(0.2, 0.68, [
+            [0, "rgba(150,225,255,0.98)"],
+            [0.07, "rgba(70,190,255,0.98)"],
+            [0.15, "rgba(30,120,255,0.97)"],
+            [0.24, "rgba(6,40,170,0.97)"],
+            [0.32, "rgba(90,205,255,0.98)"],
+            [0.4, "rgba(120,205,255,0.98)"],
+            [0.47, "rgba(40,140,255,0.97)"],
+            [0.56, "rgba(5,30,150,0.97)"],
+            [0.65, "rgba(60,170,255,0.98)"],
+            [0.72, "rgba(110,195,255,0.98)"],
+            [0.8, "rgba(20,80,230,0.97)"],
+            [0.9, "rgba(4,22,120,0.96)"],
+            [1, "rgba(2,12,70,0.94)"],
           ]);
-          // thin soft lines where one band meets the next: a dark edge with a pale edge beside it
-          for (const rr of [0.285, 0.375, 0.465, 0.555]) {
+          for (const rr of [0.3, 0.4, 0.5, 0.6]) {
             ringGradient(rr - 0.045, rr, [
               [0, "rgba(4,22,105,0)"],
-              [1, "rgba(4,22,105,0.55)"],
+              [1, "rgba(4,22,105,0.38)"],
             ]);
             ringGradient(rr, rr + 0.03, [
-              [0, "rgba(170,228,255,0.38)"],
+              [0, "rgba(170,228,255,0.32)"],
               [1, "rgba(120,200,255,0)"],
             ]);
-            c.strokeStyle = "rgba(215,244,255,0.75)";
-            c.lineWidth = Math.max(0.7, R * 0.0032);
-            arc(rr + 0.002, 0, TAU);
           }
-          // a few broad, uneven smudges so the bands are not perfectly uniform
-          for (let q = 0; q < 26; q++) {
+          // broad, uneven smudges whose paths wander instead of following perfect circles
+          for (let q = 0; q < 30; q++) {
             const h = seed + q * 5.3;
-            const r = 0.22 + rnd(h + 1) * 0.4;
             const bright = rnd(h + 2) < 0.5;
-            streak(r, rnd(h + 3) * TAU, 0.8 + rnd(h + 4) * 2.2, R * (0.018 + rnd(h + 5) * 0.03), bright ? "150,220,255" : "8,40,150", bright ? 0.1 : 0.14);
+            wander(0.22 + rnd(h + 1) * 0.4, rnd(h + 3) * TAU, 0.8 + rnd(h + 4) * 2.2, R * (0.018 + rnd(h + 5) * 0.03), bright ? "150,220,255" : "8,40,150", bright ? 0.12 : 0.18, 0.02, h);
           }
           c.globalCompositeOperation = "lighter";
-          // a handful of long, smooth white swooshes lying along the bands
-          for (let q = 0; q < 16; q++) {
+          // long white-cyan swooshes, some hugging the band edges
+          for (let q = 0; q < 26; q++) {
             const h = seed + 3000 + q * 4.1;
-            const r = 0.24 + rnd(h + 1) * 0.38;
-            softStreak(r, rnd(h + 2) * TAU, 0.7 + rnd(h + 3) * 1.9, R * (0.0025 + rnd(h + 4) * 0.005), rnd(h + 5) < 0.6 ? "235,250,255" : "140,220,255", 0.45 + rnd(h + 6) * 0.45);
+            const edge = q % 3 === 0 ? [0.3, 0.4, 0.5, 0.6][q % 4] + (rnd(h + 8) - 0.5) * 0.01 : 0.24 + rnd(h + 1) * 0.42;
+            wander(edge, rnd(h + 2) * TAU, 0.8 + rnd(h + 3) * 2.2, R * (0.007 + rnd(h + 4) * 0.012), rnd(h + 5) < 0.6 ? "200,238,255" : "110,200,255", 0.28 + rnd(h + 6) * 0.35, 0.012, h);
           }
           c.globalCompositeOperation = "source-over";
         } else if (zi === 1) {
-          // dark base
-          ringGradient(0.64, 1.08, [
+          // near-black base
+          ringGradient(0.68, 1.0, [
             [0, "rgba(8,34,130,0.9)"],
-            [0.05, "rgba(2,8,30,0.97)"],
+            [0.04, "rgba(2,8,30,0.97)"],
             [1, "rgba(1,4,14,0.97)"],
           ]);
-          // two smooth luminous blue bands, with a pale line along each edge
-          const glowBand = (r0: number, r1: number, core: string, edge: string) =>
-            ringGradient(r0, r1, [
-              [0, "rgba(8,40,160,0)"],
-              [0.18, edge],
-              [0.5, core],
-              [0.82, edge],
-              [1, "rgba(8,40,160,0)"],
-            ]);
-          glowBand(0.712, 0.805, "rgba(85,198,255,0.97)", "rgba(30,112,245,0.8)");
-          glowBand(0.912, 1.0, "rgba(70,188,255,0.98)", "rgba(25,100,240,0.8)");
-          c.strokeStyle = "rgba(225,245,255,0.8)";
+          // one narrow smooth luminous band hugging the inner disc
+          ringGradient(0.69, 0.735, [
+            [0, "rgba(8,40,160,0)"],
+            [0.2, "rgba(30,112,245,0.8)"],
+            [0.5, "rgba(90,200,255,0.97)"],
+            [0.8, "rgba(30,112,245,0.8)"],
+            [1, "rgba(8,40,160,0)"],
+          ]);
+          c.strokeStyle = "rgba(225,245,255,0.7)";
           c.lineWidth = Math.max(0.8, R * 0.004);
-          arc(0.722, 0, TAU);
-          c.strokeStyle = "rgba(205,238,255,0.6)";
-          arc(0.797, 0, TAU);
-          // uneven dark smudges across the bright bands (soft, wide)
-          for (let q = 0; q < 34; q++) {
-            const h = seed + 200 + q * 5.1;
-            const inBand = rnd(h + 1) < 0.5 ? 0.715 + rnd(h + 2) * 0.085 : 0.915 + rnd(h + 2) * 0.085;
-            streak(inBand, rnd(h + 3) * TAU, 0.5 + rnd(h + 4) * 1.8, R * (0.008 + rnd(h + 5) * 0.014), "4,22,100", 0.25 + rnd(h + 6) * 0.2);
-          }
-          // radius picker: mostly the dark ring and the dark inner strip, a little everywhere
+          arc(0.7, 0, TAU);
+          // faint blue haze on the inner edge of the wide dark ring
+          ringGradient(0.735, 0.775, [
+            [0, "rgba(30,100,235,0.22)"],
+            [1, "rgba(30,100,235,0)"],
+          ]);
+          // where specks and scratches land: mostly the wide dark ring (0.75 .. 0.935)
+          const laneR = (h: number, bright: boolean) => {
+            let r = 0.74 + rnd(h + 1) * 0.17;
+            for (let t = 1; t < 6 && (laneAt(r) >= 0.5) === bright === false; t++) r = 0.74 + rnd(h + 1 + t * 13.1) * 0.17;
+            return r;
+          };
           const pickR = (h: number) => {
             const k = rnd(h);
-            if (k < 0.62) return 0.815 + rnd(h + 1) * 0.095; // dark stippled ring
-            if (k < 0.82) return 0.645 + rnd(h + 1) * 0.07; // dark inner strip
-            if (k < 0.9) return 1.005 + rnd(h + 1) * 0.07; // dark outer strip
-            if (k < 0.95) return 0.715 + rnd(h + 1) * 0.09; // fine lines inside the first bright band
-            return 0.915 + rnd(h + 1) * 0.085; // ... and inside the second
+            if (k < 0.82) return laneR(h, true);
+            if (k < 0.9) return 0.695 + rnd(h + 1) * 0.04;
+            return 0.91 + rnd(h + 1) * 0.025;
           };
-          // dark specks first (so they punch holes in the bright bands too)
-          for (let q = 0; q < 5500; q++) {
+          // a blob: a dot, or a short smear along the orbit (round caps make it soft)
+          const blob = (r: number, a: number, w: number, smear: number, col: string) => {
+            c.strokeStyle = col;
+            c.lineWidth = w;
+            arc(r, a, (w / (R * r)) * smear);
+          };
+          for (let q = 0; q < 22000; q++) {
             const h = seed + 30000 + q * 2.9;
-            speck(pickR(h), rnd(h + 3) * TAU, Math.max(0.8, R * (0.003 + rnd(h + 4) * 0.005)), `rgba(1,4,14,${0.6 + rnd(h + 5) * 0.4})`);
+            speck(laneR(h, false), rnd(h + 3) * TAU, Math.max(0.8, R * (0.003 + rnd(h + 4) * 0.006)), `rgba(1,4,14,${0.6 + rnd(h + 5) * 0.4})`);
           }
+          // chunky dark clumps that break the ring into ragged pieces
+          for (let q = 0; q < 2600; q++) {
+            const h = seed + 70000 + q * 3.3;
+            blob(laneR(h, false), rnd(h + 4) * TAU, R * (0.005 + rnd(h + 2) * 0.011), 0.3 + rnd(h + 5) * 2.5, `rgba(1,4,14,${0.75 + rnd(h + 3) * 0.25})`);
+          }
+          // pale silver band just inside the glowing line
+          ringGradient(0.9, 0.95, [
+            [0, "rgba(190,205,230,0)"],
+            [0.35, "rgba(190,208,235,0.5)"],
+            [0.7, "rgba(205,225,250,0.62)"],
+            [1, "rgba(120,190,255,0.35)"],
+          ]);
           c.globalCompositeOperation = "lighter";
-          // fine concentric arcs, white / cyan / blue, short and long, thin
-          for (let q = 0; q < 520; q++) {
+          // fine concentric scratches
+          for (let q = 0; q < 40; q++) {
             const h = seed + 1000 + q * 4.37;
             const k = rnd(h + 3);
-            const rgb = k < 0.26 ? "238,248,255" : k < 0.58 ? "115,205,255" : "40,125,245";
+            const rgb = k < 0.3 ? "238,248,255" : k < 0.62 ? "115,205,255" : "40,125,245";
             const w = Math.max(0.55, R * (0.0012 + Math.pow(rnd(h + 2), 2) * 0.0035));
-            streak(pickR(h), rnd(h + 5) * TAU, 0.08 + Math.pow(rnd(h + 6), 1.5) * 1.8, w, rgb, 0.3 + rnd(h + 4) * 0.65);
+            wander(pickR(h), rnd(h + 5) * TAU, 0.1 + Math.pow(rnd(h + 6), 1.8) * 1.3, w, rgb, 0.2 + rnd(h + 4) * 0.5, 0.006, h);
           }
-          // salt-and-pepper grain: white, cyan and blue specks
-          for (let q = 0; q < 6500; q++) {
+          // short brush dabs whose direction wanders off the orbit, like paint flicks
+          for (let q = 0; q < 11000; q++) {
+            const h = seed + 150000 + q * 2.37;
+            const r = 0.7 + Math.pow(rnd(h + 1), 0.9) * 0.2;
+            const a = rnd(h + 2) * TAU;
+            const x = Math.cos(a) * R * r;
+            const y = Math.sin(a) * R * r;
+            const d = a + Math.PI / 2 + (rnd(h + 3) - 0.5) * (rnd(h + 9) < 0.3 ? 2.8 : 0.8);
+            const len = R * (0.008 + Math.pow(rnd(h + 4), 1.8) * 0.05);
+            const t = rnd(h + 6);
+            if (t >= 0.62 ? laneAt(r) > 0.5 : laneAt(r) < 0.42) continue;
+            const al = 0.55 + rnd(h + 8) * 0.45;
+            c.strokeStyle = t < 0.28 ? `rgba(246,251,255,${al * 0.9})` : t < 0.46 ? `rgba(120,212,255,${al * 0.85})` : t < 0.62 ? `rgba(40,118,242,${al * 0.85})` : `rgba(1,4,14,${al})`;
+            c.lineWidth = Math.max(1, R * (0.003 + rnd(h + 5) * 0.006));
+            c.beginPath();
+            c.moveTo(x, y);
+            c.lineTo(x + Math.cos(d) * len, y + Math.sin(d) * len);
+            c.stroke();
+          }
+          // fine grain
+          for (let q = 0; q < 3500; q++) {
             const h = seed + 20000 + q * 3.17;
             const w = rnd(h + 6);
-            const al = 0.5 + rnd(h + 7) * 0.5;
-            const col =
-              w < 0.3 ? `rgba(238,248,255,${al})` : w < 0.6 ? `rgba(125,205,255,${al})` : `rgba(55,125,238,${al})`;
+            const al = 0.45 + rnd(h + 7) * 0.5;
+            const col = w < 0.34 ? `rgba(238,248,255,${al})` : w < 0.64 ? `rgba(125,205,255,${al})` : `rgba(55,125,238,${al})`;
             speck(pickR(h), rnd(h + 4) * TAU, Math.max(0.7, R * (0.0022 + rnd(h + 5) * 0.0035)), col);
           }
-          // the thin glowing rim just outside the second bright band; thickness and brightness drift around it
-          const steps = 150;
+          // chunky bright clumps, thicker toward both edges of the dark ring
+          for (let q = 0; q < 1200; q++) {
+            const h = seed + 60000 + q * 3.9;
+            let r = 0.74 + Math.pow(rnd(h + 1), rnd(h + 7) < 0.5 ? 1.8 : 0.55) * 0.17;
+            if (laneAt(r) < 0.45) r = laneR(h + 2, true);
+            const pick = rnd(h + 4);
+            const al = 0.5 + rnd(h + 5) * 0.45;
+            const col = pick < 0.42 ? `rgba(238,248,255,${al})` : pick < 0.72 ? `rgba(120,200,255,${al})` : `rgba(45,120,240,${al})`;
+            blob(r, rnd(h + 6) * TAU, R * (0.004 + rnd(h + 3) * 0.008), 0.2 + rnd(h + 2) * 2.4, col);
+          }
+          // the continuous glowing line: wide soft halo, bright blue body, pale core; brightness drifts around it
+          const steps = 240;
+          c.lineCap = "butt";
           for (let q = 0; q < steps; q++) {
             const a0 = (q / steps) * TAU;
-            const br = 0.45 + 0.55 * n1(a0 * 2.6 + 9.3);
-            const wob = (n1(a0 * 5 + 2.2) - 0.5) * 0.01;
-            const piece = (TAU / steps) * 1.35;
-            c.strokeStyle = `rgba(35,130,255,${0.1 + 0.18 * br})`;
-            c.lineWidth = R * (0.04 + 0.04 * br);
-            arc(1.015 + wob, a0, piece);
-            c.strokeStyle = `rgba(230,247,255,${0.4 + 0.55 * br})`;
-            c.lineWidth = Math.max(0.8, R * (0.003 + 0.006 * br));
-            arc(1.012 + wob, a0, piece);
+            const br = 0.5 + 0.5 * n1(a0 * 2.6 + 9.3);
+            const wob = (n1(a0 * 5 + 2.2) - 0.5) * 0.008;
+            const piece = (TAU / steps) * 1.04;
+            c.strokeStyle = `rgba(30,125,255,${0.08 + 0.12 * br})`;
+            c.lineWidth = R * (0.11 + 0.05 * br);
+            arc(0.935 + wob, a0, piece);
+            c.strokeStyle = `rgba(50,170,255,${0.75 + 0.2 * br})`;
+            c.lineWidth = R * (0.04 + 0.016 * br);
+            arc(0.935 + wob, a0, piece);
+            c.strokeStyle = `rgba(170,225,255,${0.4 + 0.3 * br})`;
+            c.lineWidth = Math.max(1.2, R * (0.007 + 0.008 * br));
+            arc(0.933 + wob, a0, piece);
           }
+          c.lineCap = "round";
           c.globalCompositeOperation = "source-over";
         } else {
-          // deep blue grainy belt that fades into space
-          ringGradient(1.08, 1.26, [
-            [0, "rgba(10,50,170,0.92)"],
-            [0.3, "rgba(18,80,215,0.88)"],
-            [0.7, "rgba(10,45,160,0.6)"],
-            [1, "rgba(5,25,100,0)"],
+          // belt: deep blue haze, then big soft blobs in rows along the orbit (blue / grey / white, a few orange and yellow)
+          ringGradient(0.96, 1.16, [
+            [0, "rgba(12,50,170,0.32)"],
+            [0.25, "rgba(16,70,200,0.4)"],
+            [0.6, "rgba(8,36,130,0.24)"],
+            [1, "rgba(4,20,80,0)"],
           ]);
-          for (let q = 0; q < 9000; q++) {
+          const rows = 28;
+          for (let q = 0; q < 14000; q++) {
             const h = seed + q * 2.71;
-            const r = 1.08 + Math.pow(rnd(h + 1), 0.95) * 0.18;
-            if (rnd(h + 8) < ((r - 1.08) / 0.18) * 0.6) continue;
-            const w = rnd(h + 4);
-            const al = 0.6 + rnd(h + 5) * 0.35;
+            const row = Math.floor(rnd(h + 1) * rows);
+            const fr = row / rows;
+            if (rnd(h + 8) < fr * 0.45) continue; // rows thin out toward the outside
+            const r = 1.0 + fr * 0.13 + (rnd(h + 2) - 0.5) * 0.012;
+            const pick = rnd(h + 4);
+            const al = 0.55 + rnd(h + 5) * 0.4;
             const col =
-              w < 0.4
-                ? `rgba(22,75,205,${al})`
-                : w < 0.72
-                  ? `rgba(55,135,255,${al})`
-                  : w < 0.82
-                    ? `rgba(235,246,255,${al})`
-                    : `rgba(2,6,24,${al})`;
-            speck(r, rnd(h + 2) * TAU, R * (0.003 + rnd(h + 3) * 0.007), col);
+              pick < 0.42 ? `rgba(35,100,232,${al})`
+              : pick < 0.62 ? `rgba(90,160,255,${al})`
+              : pick < 0.77 ? `rgba(140,160,195,${al})`
+              : pick < 0.88 ? `rgba(212,222,238,${al})`
+              : pick < 0.92 ? `rgba(255,160,60,${al})`
+              : pick < 0.96 ? `rgba(255,215,80,${al})`
+              : `rgba(3,8,30,${al})`;
+            const w = R * (0.004 + Math.pow(rnd(h + 3), 1.4) * 0.016);
+            c.strokeStyle = col;
+            c.lineWidth = w;
+            arc(r, rnd(h + 6) * TAU, (w / (R * r)) * (0.2 + rnd(h + 7) * 1.8));
+          }
+          // grainy confetti out to the ragged edge: tiny blue, white, orange and yellow specks
+          for (let q = 0; q < 16000; q++) {
+            const h = seed + 90000 + q * 2.13;
+            const f = Math.pow(rnd(h + 1), 1.25);
+            if (rnd(h + 8) < f * 0.8) continue;
+            const w = rnd(h + 4);
+            const al = 0.55 + rnd(h + 5) * 0.45;
+            c.fillStyle =
+              w < 0.3 ? `rgba(240,248,255,${al})` : w < 0.55 ? `rgba(125,212,255,${al})` : w < 0.92 ? `rgba(45,125,240,${al})` : w < 0.96 ? `rgba(255,176,64,${al})` : `rgba(255,224,112,${al})`;
+            const a = rnd(h + 2) * TAU;
+            const rr = 1.0 + f * 0.15;
+            const sz = Math.max(0.7, R * (0.0018 + rnd(h + 3) * 0.004));
+            c.fillRect(Math.cos(a) * R * rr, Math.sin(a) * R * rr, sz, sz);
           }
         }
       });
@@ -991,9 +1305,16 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
       const tilt = TILT + driftY * 0.04;
       const core = coreOf(radius);
       const sizeK = Math.min(1.15, Math.max(0.55, radius / 300));
+      // the planet floats above the ring plane, toward the viewer: its centre sits up-left of the disc centre
+      const planetX = -0.12 * radius;
+      const planetY = -0.175 * radius;
 
       /* project every particle once per frame */
       for (let i = 0; i < n; i++) {
+        if (prank[i] > quality) {
+          al[i] = 0;
+          continue;
+        }
         const p = particles[i];
         const a = p.phase + angle * p.speed;
         const depth = Math.sin(a);
@@ -1003,12 +1324,17 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
         ys[i] = (depth * p.r * tilt + p.z) * radius * persp;
         ss[i] = p.size * persp * sizeK;
         ds[i] = depth;
-        al[i] = p.kind === 4 ? 0.85 : Math.min(1, (p.dust ? 0.5 : 0.62 + (1 - Math.abs(depth)) * 0.3) * tw);
+        const lit = Math.min(1, Math.max(0, 0.5 - 0.5 * (xs[i] / (radius * 1.2)) + (ys[i] / (radius * 1.2)) * 0.12));
+        al[i] = p.kind === 4 ? 0.85 : Math.min(1, (p.dust ? 0.5 : 0.62 + (1 - Math.abs(depth)) * 0.3) * tw * (0.58 + 0.3 * lit));
       }
 
       /* infalling dust and stars: far out, they spiral toward the rings, speed up, then fade */
       for (let i = 0; i < im; i++) {
         const p = infall[i];
+        if (p.tw / TAU > quality) {
+          ial[i] = 0;
+          continue;
+        }
         const f = (p.p0 + t * 0.000011 * p.speed) % 1;
         const rr = p.rIn + (p.rOut - p.rIn) * (1 - f * f);
         const a = p.phase + p.spin * f + (angle * 0.6) / Math.pow(rr, 1.5);
@@ -1016,7 +1342,7 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
         const persp = 2.8 / (2.8 - depth * 0.55);
         ix[i] = Math.cos(a) * rr * radius * persp;
         iy[i] = (depth * rr * tilt + p.z * rr) * radius * persp;
-        const f2 = Math.max(0, f - 0.012);
+        const f2 = Math.max(0, f - 0.03);
         const r2 = p.rIn + (p.rOut - p.rIn) * (1 - f2 * f2);
         const a2 = p.phase + p.spin * f2 + (angle * 0.6) / Math.pow(r2, 1.5);
         const d2 = Math.sin(a2);
@@ -1035,8 +1361,8 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
       /* soft glow around the disc */
       g.globalCompositeOperation = "lighter";
       const halo = g.createRadialGradient(0, 0, 10, 0, 0, radius * 1.2);
-      halo.addColorStop(0, "rgba(40,150,255,0.38)");
-      halo.addColorStop(0.3, "rgba(20,100,255,0.2)");
+      halo.addColorStop(0, "rgba(40,150,255,0.2)");
+      halo.addColorStop(0.3, "rgba(20,100,255,0.11)");
       halo.addColorStop(0.7, "rgba(30,90,230,0.06)");
       halo.addColorStop(1, "rgba(0,0,0,0)");
       g.fillStyle = halo;
@@ -1051,7 +1377,6 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
         g.clip();
         g.save();
         g.scale(1, tilt); // circles become the tilted disc
-        g.globalAlpha = front ? 1 : 0.78;
         for (let z = 0; z < 3; z++) {
           const tex = ringTex[z];
           if (!tex) continue;
@@ -1060,53 +1385,12 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
           g.drawImage(tex, -texHalf, -texHalf, texHalf * 2, texHalf * 2);
           g.restore();
         }
-        g.globalAlpha = 1;
-        // light falls on the inner disc from the lit side: a soft bright lobe facing the light
-        if (typeof g.createConicGradient === "function") {
-          g.save();
+        // lighting and the planet's shadow were baked once (bakeLight): two cheap bitmap draws per frame
+        if (lightDark) g.drawImage(lightDark, -texHalf, -texHalf, texHalf * 2, texHalf * 2);
+        if (lightGlow) {
           g.globalCompositeOperation = "lighter";
-          const lit = g.createConicGradient(0, 0, 0);
-          for (let k = 0; k <= 36; k++) {
-            const a = (k / 36) * TAU;
-            const lobe = Math.pow(Math.max(0, Math.cos(a + 1.33)), 3);
-            lit.addColorStop(k / 36, `rgba(120,205,255,${(0.02 + 0.2 * lobe).toFixed(3)})`);
-          }
-          g.strokeStyle = lit;
-          g.lineWidth = radius * 0.44;
-          g.beginPath();
-          g.arc(0, 0, radius * 0.42, 0, TAU);
-          g.stroke();
-          g.restore();
-        }
-        // shadow cast by the planet across the rings, pointing away from the light
-        g.save();
-        g.rotate(1.81);
-        const shLen = radius * 1.5;
-        const shW = core * 0.95;
-        for (let k = 0; k < 10; k++) {
-          const a = 0.62 * Math.pow(1 - k / 10, 0.8);
-          const sg = g.createLinearGradient(0, -shW * 1.25, 0, shW * 1.25);
-          sg.addColorStop(0, "rgba(1,4,16,0)");
-          sg.addColorStop(0.22, `rgba(1,4,16,${a})`);
-          sg.addColorStop(0.78, `rgba(1,4,16,${a})`);
-          sg.addColorStop(1, "rgba(1,4,16,0)");
-          g.fillStyle = sg;
-          g.fillRect((k / 10) * shLen, -shW * 1.25, shLen / 10 + 1, shW * 2.5);
-        }
-        g.restore();
-        // lighting: the far side of the disc falls into shade
-        if (typeof g.createConicGradient === "function") {
-          const cg = g.createConicGradient(0, 0, 0);
-          for (let k = 0; k <= 24; k++) {
-            const a = (k / 24) * TAU;
-            const dark = Math.pow(Math.max(0, Math.cos(a - 1.81)), 1.5) * 0.46;
-            cg.addColorStop(k / 24, `rgba(2,6,22,${dark})`);
-          }
-          g.strokeStyle = cg;
-          g.lineWidth = radius * 1.12;
-          g.beginPath();
-          g.arc(0, 0, radius * 0.74, 0, TAU);
-          g.stroke();
+          g.drawImage(lightGlow, -texHalf, -texHalf, texHalf * 2, texHalf * 2);
+          g.globalCompositeOperation = "source-over";
         }
         g.restore();
         g.restore();
@@ -1115,24 +1399,106 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
       function particlePass(front: boolean, dark: boolean) {
         g.save();
         g.globalCompositeOperation = dark ? "source-over" : "lighter";
+        let lastKind = -1;
         for (let i = 0; i < n; i++) {
-          if (ds[i] > 0 !== front) continue;
-          const isDark = particles[i].kind === 4;
-          if (isDark !== dark) continue;
-          g.globalAlpha = al[i];
-          g.fillStyle = COLORS[particles[i].kind];
+          const a = al[i];
+          if (a <= 0 || ds[i] > 0 !== front) continue;
+          const kind = pkind[i];
+          if ((kind === 4) !== dark) continue;
+          if (kind !== lastKind) {
+            g.fillStyle = COLORS[kind];
+            lastKind = kind;
+          }
+          g.globalAlpha = a;
           dot(xs[i], ys[i], ss[i]);
           if (glint[i]) {
             const gl = Math.pow(Math.max(0, Math.sin(t * 0.003 + particles[i].tw)), 6);
             if (gl > 0.05) {
               const rr = (ss[i] * 2 + 2.5) * (0.6 + gl);
-              const bloom = g.createRadialGradient(xs[i], ys[i], 0, xs[i], ys[i], rr);
-              bloom.addColorStop(0, "rgba(225,245,255,0.9)");
-              bloom.addColorStop(1, "rgba(120,190,255,0)");
               g.globalAlpha = gl * 0.8;
-              g.fillStyle = bloom;
-              g.fillRect(xs[i] - rr, ys[i] - rr, rr * 2, rr * 2);
+              g.drawImage(glowWhite, xs[i] - rr, ys[i] - rr, rr * 2, rr * 2);
+              lastKind = -1; // fillStyle is unchanged, but alpha was touched: keep logic simple
             }
+          }
+        }
+        g.restore();
+      }
+
+      /* golden orbits: glittering comet-like streams on tilted ellipses around the planet.
+         front = nearer the viewer than the planet (drawn after it); the rest passes behind it */
+      function goldPass(front: boolean) {
+        if (!front) {
+          for (let i = 0; i < goldN; i++) {
+            if (grank[i] > quality) {
+              gA[i] = 0;
+              continue;
+            }
+            const d = gold[i];
+            const o = GOLD_ORBITS[d.orbit];
+            const phi = o.phi + o.prec * t;
+            const th = o.theta + 0.08 * Math.sin(t * 0.0003 + d.orbit * 1.7);
+            const u = ((d.u % 1) + 1) % 1;
+            const ang = TAU * u + o.dir * o.spin * t;
+            const a = o.a * (1 + d.off);
+            const x1 = Math.cos(ang) * a;
+            const y1 = Math.sin(ang) * a * o.e;
+            const y2 = y1 * Math.cos(th);
+            gX[i] = (x1 * Math.cos(phi) - y2 * Math.sin(phi)) * core;
+            gY[i] = (x1 * Math.sin(phi) + y2 * Math.cos(phi)) * core;
+            gZ[i] = y1 * Math.sin(th);
+            const taper = 0.4 + 0.6 * Math.pow(o.dir > 0 ? u : 1 - u, 1.5); // bright head, fading tail behind it
+            gA[i] = taper * (0.65 + 0.35 * Math.sin(t * 0.005 + d.tw));
+          }
+        }
+        g.save();
+        g.rotate(-TILT_ANGLE); // screen-aligned, like the planet
+        g.translate(planetX, planetY); // orbits circle the planet, not the disc centre
+        g.globalCompositeOperation = "source-over"; // "lighter" would turn gold white on the bright blue disc
+        // a very faint thread along each orbit
+        g.strokeStyle = "rgba(255,206,90,0.32)";
+        g.lineWidth = 1;
+        g.beginPath();
+        for (const o of GOLD_ORBITS) {
+          const k = GOLD_ORBITS.indexOf(o);
+          const phi = o.phi + o.prec * t;
+          const th = o.theta + 0.08 * Math.sin(t * 0.0003 + k * 1.7);
+          let px = 0;
+          let py = 0;
+          let pz = 0;
+          for (let s = 0; s <= 72; s++) {
+            const ang = (s / 72) * TAU;
+            const x1 = Math.cos(ang) * o.a;
+            const y1 = Math.sin(ang) * o.a * o.e;
+            const y2 = y1 * Math.cos(th);
+            const x = (x1 * Math.cos(phi) - y2 * Math.sin(phi)) * core;
+            const y = (x1 * Math.sin(phi) + y2 * Math.cos(phi)) * core;
+            const z = y1 * Math.sin(th);
+            if (s > 0 && (pz + z > 0) === front) {
+              g.moveTo(px, py);
+              g.lineTo(x, y);
+            }
+            px = x;
+            py = y;
+            pz = z;
+          }
+        }
+        g.stroke();
+        let lastGold = -1;
+        for (let i = 0; i < goldN; i++) {
+          if (gA[i] <= 0 || gZ[i] > 0 !== front) continue;
+          const d = gold[i];
+          const ps = 1 + 0.03 * gZ[i];
+          const sz = d.size * sizeK * ps;
+          g.globalAlpha = Math.min(1, gA[i]) * 0.95;
+          if (d.kind !== lastGold) {
+            g.fillStyle = GOLD_FILL[d.kind];
+            lastGold = d.kind;
+          }
+          dot(gX[i], gY[i], sz);
+          if (d.big) {
+            const bs = (7 + d.size * 6) * sizeK * ps;
+            g.globalAlpha = Math.min(1, gA[i]) * 0.6;
+            g.drawImage(goldSprite, gX[i] - bs, gY[i] - bs, bs * 2, bs * 2);
           }
         }
         g.restore();
@@ -1151,7 +1517,7 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
           if (p.trail) {
             g.strokeStyle = COLORS[p.kind];
             g.lineWidth = Math.max(0.6, isz[i] * 0.9);
-            g.globalAlpha = al * 0.4;
+            g.globalAlpha = al * 0.5;
             g.beginPath();
             g.moveTo(itx[i], ity[i]);
             g.lineTo(ix[i], iy[i]);
@@ -1161,12 +1527,8 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
           dot(ix[i], iy[i], isz[i]);
           if (p.big) {
             const rr = isz[i] * 3 + 5;
-            const bl = g.createRadialGradient(ix[i], iy[i], 0, ix[i], iy[i], rr);
-            bl.addColorStop(0, "rgba(225,245,255,0.85)");
-            bl.addColorStop(1, "rgba(120,190,255,0)");
             g.globalAlpha = al * 0.8;
-            g.fillStyle = bl;
-            g.fillRect(ix[i] - rr, iy[i] - rr, rr * 2, rr * 2);
+            g.drawImage(glowWhite, ix[i] - rr, iy[i] - rr, rr * 2, rr * 2);
             const arm = isz[i] * 5 + 4;
             g.globalAlpha = al * 0.7;
             g.strokeStyle = "#e8f6ff";
@@ -1192,8 +1554,8 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
       g.globalCompositeOperation = "lighter";
       g.scale(1, tilt);
       const plate = g.createRadialGradient(0, 0, radius * 0.1, 0, 0, radius * 0.62);
-      plate.addColorStop(0, "rgba(90,210,255,0.62)");
-      plate.addColorStop(0.6, "rgba(35,135,255,0.32)");
+      plate.addColorStop(0, "rgba(70,200,255,0.3)");
+      plate.addColorStop(0.6, "rgba(30,130,255,0.14)");
       plate.addColorStop(1, "rgba(20,90,255,0)");
       g.fillStyle = plate;
       g.beginPath();
@@ -1202,10 +1564,12 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
       g.restore();
 
       drawRingLayer(true);
+      goldPass(false);
 
       /* ---------- planet: lit, slowly rotating sphere ---------- */
       g.save();
       g.rotate(-TILT_ANGLE); // upright so light always comes from the upper-left
+      g.translate(planetX, planetY);
 
       g.globalCompositeOperation = "lighter";
       const glow = g.createRadialGradient(0, 0, core * 0.8, 0, 0, core * 3.2);
@@ -1216,25 +1580,60 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
       g.fillRect(-core * 3.4, -core * 3.4, core * 6.8, core * 6.8);
       g.globalCompositeOperation = "source-over";
 
-      renderPlanet(angle * 0.35);
+      const turnsNow = angle * 0.35;
+      if (Math.abs(turnsNow - planetTurns) > 0.002) {
+        renderPlanet(turnsNow);
+        planetTurns = turnsNow;
+      }
       if (pCanvas) g.drawImage(pCanvas, -pS / (2 * pK), -pS / (2 * pK), pS / pK, pS / pK);
       g.restore();
 
+      goldPass(true);
       particlePass(true, false);
       particlePass(true, true);
       infallPass(true);
 
       /* dust plumes flowing outward along the minor axis (orange / yellow / white specks) */
+      ensurePlumeCache(radius, curDpr);
+      for (let h = 0; h < 2; h++) {
+        if (plumeDirty[h] || (h === plumeNext && t - plumeLast >= 125)) {
+          renderPlumeHalf(h, t, radius, sizeK);
+          plumeDirty[h] = false;
+          if (h === plumeNext) {
+            plumeLast = t;
+            plumeNext ^= 1;
+          }
+        }
+      }
       g.globalCompositeOperation = "lighter";
-      for (const p of plumes) {
+      g.globalAlpha = 1;
+      for (const cv of plumeCv) g.drawImage(cv, -plumeOx(), -plumeOy(), cv.width / plumeK, cv.height / plumeK);
+      // live sparkles: about one speck in five pulses with a soft bloom and a four-point glint
+      for (let pi = 0; pi < plumes.length; pi += 5) {
+        if (prankPlume[pi] > quality) continue;
+        const p = plumes[pi];
         const f = (p.p0 + t * 0.000018 * p.speed) % 1;
         const fade = Math.sin(f * Math.PI);
         if (fade <= 0.02) continue;
+        const pulse = Math.pow(Math.max(0, Math.sin(t * 0.0045 * (0.7 + p.speed * 0.5) + p.tw * 3)), 7);
+        if (pulse <= 0.06) continue;
         const x = p.u * (0.7 + f) * radius + Math.sin(t * 0.0012 + p.tw) * radius * 0.015;
         const y = p.dir * (0.45 + f * 1.25) * radius;
-        g.globalAlpha = fade * (0.55 + 0.4 * Math.sin(t * 0.004 + p.tw));
-        g.fillStyle = COLORS[p.kind];
-        dot(x, y, p.size * (1.25 - f * 0.4) * sizeK);
+        const psz = p.size * (1.25 - f * 0.4) * sizeK;
+        const rr = (psz * 2.4 + 3) * (0.6 + pulse);
+        const warm = p.kind === 2 || p.kind === 5;
+        g.globalAlpha = fade * pulse * 0.6;
+        g.drawImage(warm ? glowGold : p.kind === 0 ? glowBlue : glowWhite, x - rr, y - rr, rr * 2, rr * 2);
+        const arm = rr * 2.2 * pulse + 1;
+        g.globalAlpha = fade * pulse * 0.75;
+        g.strokeStyle = warm ? "rgb(255,214,130)" : p.kind === 0 ? "rgb(140,200,255)" : "rgb(235,248,255)";
+        g.lineWidth = 0.9;
+        g.beginPath();
+        g.moveTo(x - arm, y);
+        g.lineTo(x + arm, y);
+        g.moveTo(x, y - arm);
+        g.lineTo(x, y + arm);
+        g.stroke();
       }
       g.globalAlpha = 1;
       g.restore();
@@ -1259,11 +1658,27 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
       });
     }
 
+    let lastW = 0;
+    let lastH = 0;
+    let resizeTimer = 0;
+    let pausedUntil = 0;
+    let interactionTimer = 0;
     function resize() {
       if (!canvas) return;
+      window.clearTimeout(resizeTimer);
+      if (performance.now() < pausedUntil) {
+        resizeTimer = window.setTimeout(resize, 400);
+        return;
+      }
       width = Math.max(1, canvas.clientWidth);
       height = Math.max(1, canvas.clientHeight);
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      const pixelBudget = hero ? 400_000 : 900_000;
+      const dpr = Math.min(window.devicePixelRatio || 1, lowEnd ? 1 : 1.25,
+        Math.sqrt(pixelBudget / (width * height)));
+      curDpr = dpr;
+      lastW = width;
+      lastH = height;
+      adaptTick = -30; // ignore the slow frames right after a rebuild
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1274,13 +1689,16 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
     }
 
     function tick(now: number) {
-      if (now - last >= 1000 / 30) {
+      const frameMs = fps60 ? 1000 / 60 : 1000 / 30;
+      if (now - last >= frameMs - 4) {
         const dt = last ? Math.min(now - last, 100) : 0;
         last = now;
         time += dt;
         angle += dt * 0.00007;
-        driftX += (pointerX - driftX) * 0.05;
-        driftY += (pointerY - driftY) * 0.05;
+        // ease toward the pointer independent of the frame rate
+        const ease = 1 - Math.pow(0.95, dt / 33.3);
+        driftX += (pointerX - driftX) * ease;
+        driftY += (pointerY - driftY) * ease;
 
         for (const m of comets) {
           m.x += m.vx * dt;
@@ -1293,16 +1711,27 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
           spawnComet();
           nextComet = time + 3500 + Math.random() * 6500;
         }
+        const t0 = performance.now();
         draw(time);
+        frameCost += (performance.now() - t0 - frameCost) * 0.12;
+        // adapt: drop specks when frames get expensive, bring them back slowly when there is headroom
+        if (++adaptTick >= 20) {
+          adaptTick = 0;
+          if (frameCost > 14 && quality > 0.34) quality = Math.max(0.34, quality - 0.16);
+          else if (frameCost < 7 && quality < 1) quality = Math.min(1, quality + 0.06);
+          if (!fps60 && frameCost < 4.5 && quality >= 1) fps60 = true;
+          else if (fps60 && frameCost > 8) fps60 = false;
+        }
       }
       frame = requestAnimationFrame(tick);
     }
 
+    let onScreen = true;
     function activity() {
       cancelAnimationFrame(frame);
       frame = 0;
       last = 0;
-      if (document.hidden) return;
+      if (document.hidden || !onScreen || performance.now() < pausedUntil) return;
       if (mode === "animated" && !motion.matches)
         frame = requestAnimationFrame(tick);
       else draw(0);
@@ -1314,9 +1743,39 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
       pointerY = event.clientY / window.innerHeight - 0.5;
     };
 
-    const observer = new ResizeObserver(resize);
+    const pauseForInteraction = () => {
+      pausedUntil = performance.now() + 350;
+      cancelAnimationFrame(frame);
+      window.clearTimeout(interactionTimer);
+      interactionTimer = window.setTimeout(activity, 370);
+    };
+
+    const onResize = () => {
+      if (!canvas) return;
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      if (!lastW) return resize();
+      if (Math.abs(w - lastW) < 2 && Math.abs(h - lastH) < 2) return;
+      window.clearTimeout(resizeTimer); // rebuilding every texture is costly: wait until resizing settles
+      resizeTimer = window.setTimeout(resize, 160);
+    };
+    const observer = new ResizeObserver(onResize);
     observer.observe(canvas);
+    const io =
+      typeof IntersectionObserver === "function"
+        ? new IntersectionObserver((entries) => {
+            const vis = entries[entries.length - 1]?.isIntersecting ?? true;
+            if (vis !== onScreen) {
+              onScreen = vis;
+              activity();
+            }
+          })
+        : null;
+    io?.observe(canvas);
     window.addEventListener("pointermove", pointer, { passive: true });
+    window.addEventListener("pointerdown", pauseForInteraction, { passive: true });
+    window.addEventListener("keydown", pauseForInteraction);
+    window.addEventListener("scroll", pauseForInteraction, { passive: true, capture: true });
     document.addEventListener("visibilitychange", activity);
     motion.addEventListener("change", activity);
     resize();
@@ -1325,7 +1784,13 @@ function GalaxyCanvas({ mode, hero = false }: { mode: Mode; hero?: boolean }) {
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      window.clearTimeout(resizeTimer);
+      window.clearTimeout(interactionTimer);
+      io?.disconnect();
       window.removeEventListener("pointermove", pointer);
+      window.removeEventListener("pointerdown", pauseForInteraction);
+      window.removeEventListener("keydown", pauseForInteraction);
+      window.removeEventListener("scroll", pauseForInteraction, true);
       document.removeEventListener("visibilitychange", activity);
       motion.removeEventListener("change", activity);
     };

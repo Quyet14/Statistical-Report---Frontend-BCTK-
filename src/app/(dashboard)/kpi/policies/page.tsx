@@ -155,10 +155,6 @@ export default function KpiPoliciesPage() {
         <div>
           <span className="eyebrow">Đánh giá minh bạch</span>
           <h3 className="page-title">Công thức & chỉ tiêu KPI</h3>
-          <p className="page-description">
-            Thiết lập trọng số, khối lượng và vị trí; giữ nguyên số liệu kỳ đã
-            chốt.
-          </p>
         </div>
         <div className="toolbar">
           <Link className="secondary-action" href="/kpi">

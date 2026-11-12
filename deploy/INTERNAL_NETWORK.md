@@ -82,3 +82,11 @@ Mở Docker Desktop, sau đó chạy `./scripts/lan-services.ps1 -Action start` 
 Nếu IP Wi-Fi đổi, xác minh IP của máy trước rồi chạy `node scripts/prepare-lan-runtime.cjs --host=IP_THUC_TE` khi bộ LAN đã dừng. Công cụ kiểm tra IP được gắn trên máy, giữ nguyên secret và Redis prefix, dùng lại chứng chỉ còn hạn có SAN phù hợp hoặc tạo chứng chỉ thử mới; cổng nội bộ giữ 3300/3310. Với PowerShell Administrator, `./scripts/open-lan-firewall.ps1 -RefreshLocalAddress` chỉ cập nhật IP cục bộ của đúng rule nginx/3443/LocalSubnet đã có. Không tắt kiểm tra Origin hoặc mở 3300/3310 ra mạng.
 
 Bản duyệt việc, việc lặp lại và báo cáo có hướng dẫn chuyển bản riêng tại [WORK_FOUNDATION.md](WORK_FOUNDATION.md).
+
+## Cập nhật giao diện và tránh trùng cổng
+
+`npm run deploy:lan` build vào thư mục release riêng, chỉ thay frontend sau khi build xong; backend, Redis và nginx tiếp tục chạy. Nếu health không đạt, script khôi phục lựa chọn frontend trước đó. Sau khi thành công, tải lại trình duyệt một lần.
+
+Chỉ dùng launcher cho bộ LAN; không chạy thêm backend `npm run start:dev` trên cùng cổng 3310. Launcher từ chối start khi cổng đã bị chiếm và không tự dừng tiến trình ngoài quản lý. Kiểm tra trạng thái bằng `./scripts/lan-services.ps1 -Action status` và health bằng `node scripts/check-lan.cjs`.
+
+Có thể dừng/chạy riêng bằng `-Action stop -Service frontend` rồi `-Action start -Service frontend`; tương tự với `-Service backend`. Chỉ dùng khi đã có bộ LAN được quản lý; không thay cấu hình release khi dịch vụ đó còn đang chạy.
