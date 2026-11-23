@@ -652,3 +652,8 @@ input::placeholder, textarea::placeholder { color: #6b7d99; opacity: 1; }
   .modern-table { min-width: 0; }
   .table-card { overflow: visible; }
 }
+/* Collapsing navigation releases its width to the workspace. */
+@media (min-width: 1025px) {
+  .dashboard-shell:has(.sidebar-panel.is-collapsed) .page-shell { width:100%; max-width:none; margin-inline:0; }
+  .dashboard-shell:has(.sidebar-panel.is-collapsed) .dashboard-content { padding-inline:16px; }
+}

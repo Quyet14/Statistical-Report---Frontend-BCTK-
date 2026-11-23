@@ -11,6 +11,14 @@ vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../s
 }).outputText, { exports: exportsObject });
 const { canAccessRoute } = exportsObject;
 
+test('hospital SQL reporting setup is admin only until source department scopes exist', () => {
+  assert.equal(canAccessRoute('admin', '/reports/hospital'), true);
+  for (const role of ['manager', 'leader', 'staff', 'viewer', 'unknown']) {
+    assert.equal(canAccessRoute(role, '/reports/hospital'), false);
+    assert.equal(canAccessRoute(role, '/reports/hospital/source'), false);
+  }
+});
+
 test('admin can manage both employees and departments', () => {
   for (const route of ['/employees', '/departments', '/settings']) assert.equal(canAccessRoute('admin', route), true);
 });

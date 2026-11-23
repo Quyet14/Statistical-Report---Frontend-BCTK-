@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('start', 'stop', 'status', 'preflight')][string]$Action = 'status',
+    [ValidateSet('start', 'stop', 'status', 'preflight', 'ensure-gateway')][string]$Action = 'status',
     [ValidateSet('all', 'frontend', 'backend')][string]$Service = 'all',
     [string]$ConfigDirectory,
     [switch]$OpenFirewall
@@ -31,6 +31,35 @@ if ($Action -eq 'preflight') { Assert-ServicePortsFree; Write-Output 'Service po
 if ($Action -eq 'status') {
     if (Test-Path -LiteralPath $statePath) { Get-Content -LiteralPath $statePath } else { Write-Output 'No managed LAN services recorded.' }
     exit 0
+}
+if ($Action -eq 'ensure-gateway') {
+    if (!(Test-Path -LiteralPath $statePath)) { throw 'Start the complete LAN stack before restoring its gateway.' }
+    $origin = [Uri]$manifest.origin
+    function Test-GatewayPort {
+        $client = [Net.Sockets.TcpClient]::new()
+        try {
+            $pending = $client.BeginConnect($origin.Host, $origin.Port, $null, $null)
+            if (!$pending.AsyncWaitHandle.WaitOne(500)) { return $false }
+            $client.EndConnect($pending)
+            return $true
+        } catch { return $false }
+        finally { $client.Dispose() }
+    }
+    if (Test-GatewayPort) { Write-Output 'Gateway port is listening; no process was changed.'; exit 0 }
+    $state = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
+    $ownedGateway = @(Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -eq $state.gatewayPid -and $_.ExecutablePath -eq $nginxExecutable })
+    if ($ownedGateway.Count) { throw 'Managed nginx is running but not listening. Inspect its log before starting another instance.' }
+    if (!(Test-Path -LiteralPath $nginxExecutable)) { throw 'Portable nginx is missing; existing services were retained.' }
+    & $nginxExecutable -p $nginxPrefix -c $nginxConfig -t
+    if ($LASTEXITCODE -ne 0) { throw 'nginx config check failed; existing services were retained.' }
+    $gateway = Start-Process -FilePath $nginxExecutable -ArgumentList @('-p', $nginxPrefix, '-c', $nginxConfig) -WorkingDirectory $nginxDirectory -WindowStyle Hidden -PassThru
+    $state.gatewayPid = $gateway.Id
+    $state | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $statePath -Encoding UTF8
+    for ($attempt = 0; $attempt -lt 20; $attempt++) {
+        if (Test-GatewayPort) { Write-Output "Restored LAN gateway: $($manifest.origin); other services were retained."; exit 0 }
+        Start-Sleep -Milliseconds 250
+    }
+    throw 'nginx did not start listening. Inspect its error log; existing services were retained.'
 }
 if ($Action -eq 'stop') {
     if (Test-Path -LiteralPath $statePath) {

@@ -18,6 +18,7 @@ const managerRoutes = [
 const adminRoutes = [...managerRoutes, "/reports", "/departments", "/settings"];
 
 export function canAccessRoute(role: string, pathname: string) {
+  if ((pathname === "/reports/hospital" || pathname.startsWith("/reports/hospital/")) && role.toLowerCase() !== "admin") return false;
   if ((pathname === "/reports/templates" || pathname.startsWith("/reports/templates/")) && role.toLowerCase() !== "admin") return false;
   if((pathname==="/kpi/policies"||pathname.startsWith("/kpi/policies/"))&&!["admin","manager"].includes(role.toLowerCase()))return false;
   if (

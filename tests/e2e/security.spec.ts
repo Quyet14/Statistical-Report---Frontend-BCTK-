@@ -1,6 +1,96 @@
 import { test, expect, type Page } from '@playwright/test';
 declare global { interface Window { cspViolations?: string[] } }
 
+test('hospital preserves the original layout while displaying corrected source values', async ({page,request}) => {
+  await request.get('http://127.0.0.1:3025/__test/admin');
+  let visits=1756;
+  await page.route('**/api/reports/hospital?**', route => {
+    const period=new URL(route.request().url()).searchParams.get('period');
+    return route.fulfill({json:{status:'connected',
+      metrics:{visits:1757,admissions:115,discharges:142,currentInpatients:787,bedOccupancy:73.69,revenue:200578543.87},
+      ...(period==='day'?{fptSummary:{source:'fpt-dashboard',reportDate:'2026-11-23',visits,emergency:21,inpatients:825,revenue:202411481}}:{}),
+      asOf:'2026-11-23T16:17:47',generatedAt:new Date().toISOString(),cacheSeconds:60,
+      trend:[],departments:[],breakdown:{routine:1757,emergency:0},unavailable:{},
+      cash:{collected:200578543.87,refunded:0,invalid:0},bedSnapshot:{active:977,occupied:720,asOf:'2026-11-23T16:17:47'},
+    }});
+  });
+  await signIn(page);
+  await page.goto('/reports/hospital');
+  await page.getByRole('combobox',{name:'Thống kê',exact:true}).selectOption('day');
+  const cards=page.getByRole('region',{name:'Chỉ số bệnh viện'});
+  await expect(cards.getByRole('article')).toHaveCount(6);
+  for (const name of ['Lượt khám','Nhập viện','Xuất viện','Đang điều trị','Công suất giường','Thực thu']) await expect(cards.getByRole('heading',{name,exact:true})).toBeVisible();
+  await expect(cards.getByRole('article').filter({has:page.getByRole('heading',{name:'Lượt khám',exact:true})})).toContainText('1.756');
+  await expect(cards.getByRole('article').filter({has:page.getByRole('heading',{name:'Đang điều trị',exact:true})})).toContainText('825');
+  await expect(page.getByText(/Nguồn FPT|Chi tiết từ HIS|Tổng quan FPT/)).toHaveCount(0);
+  await expect(page.getByRole('heading',{name:'Diễn biến lượt khám',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Cơ cấu lượt khám',exact:true})).toBeVisible();
+  await expect(cards.getByRole('article').filter({has:page.getByRole('heading',{name:'Thực thu',exact:true})})).toContainText('200,58 triệu');
+  visits=1760;
+  await expect(cards).toContainText('1.760');
+  await page.screenshot({path:'test-results/hospital-fpt-source.png',fullPage:true});
+  await page.setViewportSize({width:320,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.setViewportSize({width:1400,height:1000});
+  await page.getByRole('combobox',{name:'Thống kê',exact:true}).selectOption('month');
+  await expect(cards.getByRole('heading',{name:'Cấp cứu',exact:true})).toHaveCount(0);
+  await expect(cards.getByRole('heading',{name:'Đang điều trị',exact:true})).toBeVisible();
+});
+
+test('public welcome introduces CareOps before login and keeps reports protected', async ({page}) => {
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('heading', {level:1})).toContainText('Một nền tảng.');
+  await expect(page.locator('.sidebar-panel')).toHaveCount(0);
+  await expect(page.getByRole('img', {name:/Mô hình minh họa 3D/})).toBeVisible();
+  for (const width of [1440,768,390,320]) {
+    await page.setViewportSize({width,height:900});
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(page.getByRole('link',{name:'Đăng nhập hệ thống',exact:true})).toBeVisible();
+  }
+  await page.setViewportSize({width:1440,height:1000});
+  await page.getByRole('link',{name:'Vào trang đăng nhập',exact:false}).scrollIntoViewIfNeeded();
+  await expect(page.getByRole('link',{name:'Vào trang đăng nhập',exact:false})).toBeInViewport();
+  await page.evaluate(() => scrollTo(0,0));
+  await page.screenshot({path:'test-results/welcome-desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await page.getByRole('link',{name:'Vào trang đăng nhập',exact:false}).scrollIntoViewIfNeeded();
+  await expect(page.getByRole('link',{name:'Vào trang đăng nhập',exact:false})).toBeInViewport();
+  await page.evaluate(() => scrollTo(0,0));
+  await page.screenshot({path:'test-results/welcome-mobile.png',fullPage:true});
+  await page.getByRole('link',{name:'Đăng nhập hệ thống',exact:true}).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.locator('.captcha-preview img')).toBeVisible();
+  await page.goto('/reports/hospital');
+  await expect(page).toHaveURL(/\/login$/);
+});
+
+test('programs distinguishes read-only HIS reporting from workflow integrations', async ({page, request}) => {
+  await request.get('http://127.0.0.1:3025/__test/admin');
+  await page.route('**/api/advanced-operations**', route => {
+    const path = new URL(route.request().url()).pathname;
+    return route.fulfill({json: path.endsWith('/capabilities')
+      ? {enabled:true, automationExecution:true, integrations:{his:false,sso:false}, hisReporting:{configured:true,readOnly:true}}
+      : []});
+  });
+  await signIn(page);
+  await page.goto('/programs');
+  await expect(page.getByRole('heading', {name:'Nghiệp vụ chuyên sâu',exact:true})).toBeVisible();
+  const integrations = page.locator('.programs-integrations');
+  await expect(integrations.locator('summary')).toContainText('HIS báo cáo · Chỉ đọc');
+  await integrations.locator('summary').click();
+  await expect(integrations).toContainText('HIS báo cáo: Đã cấu hình · Chỉ đọc');
+  await expect(integrations).toContainText('HIS nghiệp vụ: Chưa cấu hình');
+  await page.setViewportSize({width:390,height:844});
+  for (const button of await page.locator('.programs-tabs button').all()) {
+    await expect(button).toBeInViewport();
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({path:'test-results/programs-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1400,height:1000});
+  await page.screenshot({path:'test-results/programs-desktop.png',fullPage:true});
+});
+
 async function openOtp(page: Page, remember = false) {
   await page.goto('/login');
   await expect(page.locator('.captcha-preview img')).toBeVisible();
@@ -29,6 +119,328 @@ async function signIn(page: Page, remember = false) {
   await expect(page.locator('.sidebar-usercard')).toBeVisible();
 }
 test.beforeEach(async ({ request }) => { await request.get('http://127.0.0.1:3025/__test/reset'); });
+
+test('hospital report keeps connection settings off the web and supports mobile layout', async ({ page, request }) => {
+  await request.get('http://127.0.0.1:3025/__test/admin');
+  await page.route('**/api/reports/hospital?**', route => route.fulfill({ json: { status: 'disabled', message: 'Nguồn SQL báo cáo chưa được bật tại backend' } }));
+  let sourceRequests = 0;
+  await page.route('**/192.168.0.19/**', route => { sourceRequests++; return route.abort(); });
+  await signIn(page);
+  await page.getByRole('link', { name: 'Báo cáo bệnh viện', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Báo cáo bệnh viện', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Chưa có dữ liệu', { exact: true })).toHaveCount(6);
+  await expect(page.locator('.sidebar-item[aria-current="page"]')).toHaveCount(1);
+  await page.getByRole('combobox', { name: 'Thống kê', exact: true }).selectOption('year');
+  await page.getByLabel('Ngày tham chiếu').fill('2026-11-19');
+  await page.screenshot({ path: 'test-results/hospital-reports-desktop.png', fullPage: true });
+  await expect(page.getByRole('button', { name: /Nguồn dữ liệu/ })).toHaveCount(0);
+  await expect(page.locator('form')).toHaveCount(0);
+  expect(sourceRequests).toBe(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/hospital-reports-mobile.png', fullPage: true });
+});
+
+test('collapsed navigation uses the available width and hospital filters survive navigation and reload', async ({ page, request }) => {
+  test.setTimeout(90000);
+  await request.get('http://127.0.0.1:3025/__test/admin');
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.route('**/api/reports/hospital?**', route => route.fulfill({ json: { status: 'disabled', message: 'Fixture source disabled' } }));
+  await signIn(page);
+  await page.getByRole('button', { name: 'Thu gọn menu HuuNghi CareOps', exact: true }).click();
+  await expect(page.locator('.sidebar-panel')).toHaveClass(/is-collapsed/);
+  const shell = await page.locator('.page-shell').boundingBox();
+  const sidebar = await page.locator('.sidebar-panel').boundingBox();
+  expect(shell!.width).toBeGreaterThan(1700);
+  expect(shell!.x - sidebar!.x - sidebar!.width).toBeLessThanOrEqual(24);
+  expect(1920 - shell!.x - shell!.width).toBeLessThanOrEqual(36);
+  await page.screenshot({ path: 'test-results/collapsed-workspace-wide.png' });
+  await page.goto('/reports/hospital');
+  await page.getByRole('combobox', { name: 'Thống kê', exact: true }).selectOption('day');
+  await page.getByLabel('Ngày tham chiếu', { exact: true }).fill('2026-11-18');
+  await page.goto('/employees');
+  const reportRequests: string[] = [];
+  page.on('request', req => { if (req.url().includes('/api/reports/hospital?')) reportRequests.push(req.url()); });
+  await page.goto('/reports/hospital');
+  await expect(page.getByRole('combobox', { name: 'Thống kê', exact: true })).toHaveValue('day');
+  await expect(page.getByLabel('Ngày tham chiếu', { exact: true })).toHaveValue('2026-11-18');
+  await expect.poll(() => reportRequests.length).toBeGreaterThan(0);
+  expect(reportRequests.every(url => new URL(url).searchParams.get('period') === 'day' && new URL(url).searchParams.get('date') === '2026-11-18')).toBe(true);
+  await page.reload();
+  await expect(page.getByRole('combobox', { name: 'Thống kê', exact: true })).toHaveValue('day');
+  await expect(page.getByLabel('Ngày tham chiếu', { exact: true })).toHaveValue('2026-11-18');
+  await page.getByRole('combobox', { name: 'Thống kê', exact: true }).selectOption('year');
+  await page.reload();
+  await expect(page.getByRole('combobox', { name: 'Thống kê', exact: true })).toHaveValue('year');
+  await expect(page.getByLabel('Ngày tham chiếu', { exact: true })).toHaveValue('2026-11-18');
+});
+
+test('hospital report automatically refreshes without blanking the current snapshot', async ({ page, request }) => {
+  test.setTimeout(120000);
+  await request.get('http://127.0.0.1:3025/__test/admin');
+  let visits = 10;
+  let clsRequested = 5;
+  let clsPerformed = 3;
+  let clsWaiting = 2;
+  let unavailable = false;
+  let requests = 0;
+  await page.route('**/api/reports/hospital?**', route => {
+    requests++;
+    return unavailable ? route.fulfill({ status: 503, json: { message: 'Unavailable' } }) : route.fulfill({ json: {
+      status: 'connected', metrics: { visits, admissions: 1, discharges: 0, currentInpatients: 2, bedOccupancy: 60, revenue: 150 },
+      bedSnapshot: { active: 100, occupied: 60, asOf: '2026-11-19T10:00:00' }, cash: { collected: 200, refunded: 50, invalid: 0 },
+      asOf: '2026-11-19T10:00:00', generatedAt: new Date().toISOString(), cacheSeconds: 60,
+      trend: [{ day: '2026-11-18', visits: Math.floor(visits / 2), admissions: 0 }, { day: '2026-11-19', visits: visits - Math.floor(visits / 2), admissions: 1 }], breakdown: { routine: visits, emergency: 0 }, departments: [{ id: 1, name: 'Khoa kiểm thử', visits, admissions: 1, discharges: 0, currentInpatients: 2, revenue: 150 }], unavailable: {},
+      cls: { requested: clsRequested, performed: clsPerformed, waiting: clsWaiting, trend: [{ day: '2026-11-19', requested: clsRequested, performed: clsPerformed, waiting: clsWaiting }], byServiceType: [{ name: 'Cận Lâm Sàng', requested: clsRequested }], byServiceGroup: [
+        { name: 'Xét nghiệm', requested: clsRequested, performed: clsPerformed, waiting: clsWaiting },
+        { name: 'Chẩn đoán hình ảnh', requested: 4, performed: 3, waiting: 1 },
+        { name: 'Thăm dò chức năng', requested: 3, performed: 2, waiting: 1 },
+        { name: 'Siêu âm', requested: 2, performed: 1, waiting: 1 },
+        { name: 'Nội soi', requested: 2, performed: 1, waiting: 1 },
+      ] },
+    } });
+  });
+  await signIn(page);
+  await page.clock.install();
+  await page.goto('/reports/hospital');
+  const card = page.getByRole('article').first();
+  const clsCards = page.getByRole('region', { name: 'Chỉ định CLS theo ngày', exact: true });
+  await expect(card.getByText('10', { exact: true })).toBeVisible();
+  await expect(clsCards.locator('strong').first()).toContainText('5');
+  await expect(page.getByRole('list', { name: 'Số lượt chỉ định theo nhóm dịch vụ' }).getByRole('listitem')).toHaveCount(5);
+  await expect(page.locator('#activity-board-heading')).toHaveText('Dịch vụ & khoa/phòng');
+  await expect(page.getByRole('group', { name: 'Biểu đồ hoạt động khoa/phòng', exact: true }).getByRole('region')).toHaveCount(7);
+  await expect(page.getByRole('group', { name: 'Biểu đồ dịch vụ CLS', exact: true }).getByRole('region')).toHaveCount(3);
+  await expect(page.getByRole('region', { name: 'Dịch vụ & khoa/phòng', exact: true }).getByRole('heading', { name: /^(Hoạt động theo khoa\/phòng|Nhóm dịch vụ CLS)$/ })).toHaveText(['Hoạt động theo khoa/phòng', 'Nhóm dịch vụ CLS']);
+  await expect(page.getByRole('img', { name: 'Biểu đồ chỉ định CLS theo ngày' })).toBeVisible();
+  await expect(page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Công suất giường', exact: true }) }).getByText('60', { exact: true })).toBeVisible();
+  await expect(page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Thực thu', exact: true }) }).getByText('150', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Chưa có dữ liệu', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Chỉ số cận lâm sàng', { exact: true })).toHaveCount(0);
+  const board = page.getByRole('region', { name: 'Dịch vụ & khoa/phòng', exact: true });
+  await expect(board.getByRole('region', { name: 'Theo dõi nhóm dịch vụ CLS', exact: true })).toBeVisible();
+  await expect(board.getByRole('region', { name: 'Theo dõi hoạt động khoa/phòng', exact: true })).toBeVisible();
+  await board.getByRole('button', { name: 'Chạy danh sách', exact: true }).click();
+  await expect(board.getByRole('button', { name: 'Dừng chạy', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await board.getByRole('button', { name: 'Dừng chạy', exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const serviceFeed = page.getByLabel('Danh sách Nhóm dịch vụ CLS', { exact: true });
+  await serviceFeed.scrollIntoViewIfNeeded();
+  await board.getByRole('button', { name: 'Chạy danh sách', exact: true }).click();
+  await serviceFeed.scrollIntoViewIfNeeded();
+  await expect(serviceFeed).toBeInViewport();
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(100);
+  await page.clock.runFor(500);
+  await expect.poll(() => serviceFeed.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  const movingTop = await serviceFeed.evaluate(element => element.scrollTop);
+  await page.clock.runFor(500);
+  await expect.poll(() => serviceFeed.evaluate(element => element.scrollTop)).toBeGreaterThan(movingTop);
+  await serviceFeed.hover();
+  const pausedTop = await serviceFeed.evaluate(element => element.scrollTop);
+  await page.clock.runFor(4600);
+  expect(await serviceFeed.evaluate(element => element.scrollTop)).toBe(pausedTop);
+  await board.getByRole('button', { name: 'Dừng chạy', exact: true }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.setViewportSize({ width: 1400, height: 1000 });
+  await board.getByRole('heading', { name: 'Dịch vụ & khoa/phòng', exact: true }).scrollIntoViewIfNeeded();
+  const departmentBounds = await board.getByRole('region', { name: 'Theo dõi hoạt động khoa/phòng', exact: true }).boundingBox();
+  const serviceBounds = await board.getByRole('region', { name: 'Theo dõi nhóm dịch vụ CLS', exact: true }).boundingBox();
+  expect(departmentBounds!.x).toBeLessThan(serviceBounds!.x);
+  const clinicalBounds = await page.getByRole('group', { name: 'Biểu đồ hoạt động khoa/phòng', exact: true }).boundingBox();
+  const clsBounds = await page.getByRole('group', { name: 'Biểu đồ dịch vụ CLS', exact: true }).boundingBox();
+  expect(departmentBounds!.x).toBeLessThan(clinicalBounds!.x);
+  expect(departmentBounds!.width).toBeLessThan(clinicalBounds!.width);
+  expect(Math.abs(departmentBounds!.y - clinicalBounds!.y)).toBeLessThan(3);
+  expect(clsBounds!.x).toBeLessThan(serviceBounds!.x);
+  expect(serviceBounds!.y).toBeGreaterThan(departmentBounds!.y);
+  expect(Math.abs(clsBounds!.y - serviceBounds!.y)).toBeLessThan(3);
+  await page.screenshot({ path: 'test-results/hospital-live-board-desktop.png' });
+  const bedChart = page.getByRole('region', { name: 'Sử dụng giường bệnh', exact: true });
+  await expect(bedChart.getByRole('img', { name: 'giường đang dùng: 60%', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Thu và hoàn trả', exact: true }).getByText('150', { exact: true }).first()).toBeVisible();
+  const clsChart = page.getByRole('region', { name: 'Chỉ định CLS theo ngày', exact: true });
+  await clsChart.getByRole('button', { name: 'Mở rộng biểu đồ Chỉ định CLS theo ngày', exact: true }).click();
+  await expect(clsChart).toHaveAttribute('data-expanded', 'true');
+  await clsChart.getByRole('button', { name: 'Thu gọn biểu đồ Chỉ định CLS theo ngày', exact: true }).click();
+  await clsChart.getByText('Xem số liệu đầy đủ', { exact: false }).click();
+  await expect(clsChart.getByRole('table')).toBeVisible();
+  await clsChart.getByText('Xem số liệu đầy đủ', { exact: false }).click();
+  for (const width of [390, 768, 1400]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  await page.getByRole('region', { name: 'Diễn biến lượt khám', exact: true }).scrollIntoViewIfNeeded();
+  const compactChartBounds = await page.getByRole('group', { name: 'Biểu đồ hoạt động khoa/phòng', exact: true }).boundingBox();
+  expect(compactChartBounds!.height).toBeLessThan(520);
+  await page.screenshot({ path: 'test-results/hospital-chart-grid-desktop.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('region', { name: 'Sử dụng giường bệnh', exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/hospital-chart-grid-mobile.png' });
+  await page.setViewportSize({ width: 1400, height: 1000 });
+  visits = 20; clsRequested = 15; clsPerformed = 12; clsWaiting = 3;
+  await page.clock.runFor(5100);
+  await expect(card.getByText('20', { exact: true })).toBeVisible();
+  await expect(clsCards.locator('strong').first()).toContainText('15');
+  await expect(page.getByRole('region', { name: 'CLS đã thực hiện', exact: true }).locator('strong').first()).toContainText('12');
+  await expect(page.getByRole('region', { name: 'CLS chờ kết quả', exact: true }).locator('strong').first()).toContainText('3');
+  unavailable = true;
+  await page.clock.runFor(5100);
+  await expect(page.locator('p[role="status"]')).toContainText('Chưa cập nhật được số liệu mới');
+  await expect(card.getByText('20', { exact: true })).toBeVisible();
+  unavailable = false; visits = 30; clsRequested = 25; clsPerformed = 20; clsWaiting = 5;
+  await page.clock.runFor(5100);
+  await expect(card.getByText('30', { exact: true })).toBeVisible();
+  await expect(clsCards.locator('strong').first()).toContainText('25');
+  await expect(page.getByRole('region', { name: 'CLS đã thực hiện', exact: true }).locator('strong').first()).toContainText('20');
+  await expect(page.getByRole('region', { name: 'CLS chờ kết quả', exact: true }).locator('strong').first()).toContainText('5');
+  await expect(page.locator('p[role="status"]')).toHaveCount(0);
+  await page.goto('/employees');
+  const before = requests;
+  await page.clock.runFor(61000);
+  expect(requests).toBe(before);
+});
+
+test('hospital long lists return to a bounded scrolling frame after expand and collapse', async ({ page, request }) => {
+  await request.get('http://127.0.0.1:3025/__test/admin');
+  await page.route('**/api/reports/hospital?**', route => route.fulfill({ json: {
+    status: 'connected', metrics: { visits: 80, admissions: 0, discharges: 0, currentInpatients: 0, bedOccupancy: null, revenue: null }, trend: [], breakdown: { routine: 80, emergency: 0 }, unavailable: {}, asOf: '2026-11-19T10:00:00', generatedAt: new Date().toISOString(),
+    departments: Array.from({ length: 83 }, (_, id) => ({ id, name: `Khoa ${id + 1}`, visits: 1, admissions: 0, discharges: 0, currentInpatients: 0, revenue: 0 })),
+    cls: { requested: 12, performed: 0, waiting: 12, trend: [], byServiceType: [], byServiceGroup: Array.from({ length: 12 }, (_, id) => ({ name: `Dịch vụ ${id + 1}`, requested: 1, performed: 0, waiting: 1 })) },
+  } }));
+  await signIn(page);
+  await page.goto('/reports/hospital');
+  const board = page.getByRole('region', { name: 'Dịch vụ & khoa/phòng', exact: true });
+  await expect(board.getByRole('region', { name: 'Theo dõi hoạt động khoa/phòng', exact: true })).toBeVisible();
+  await expect(board.getByRole('list', { name: 'Số lượt chỉ định theo nhóm dịch vụ', exact: true }).getByRole('listitem')).toHaveCount(12);
+  const initialBoardHeight = await board.evaluate(el => el.clientHeight);
+  for (const [regionName, listName] of [
+    ['Theo dõi hoạt động khoa/phòng', 'Danh sách Hoạt động theo khoa/phòng'],
+    ['Theo dõi nhóm dịch vụ CLS', 'Danh sách Nhóm dịch vụ CLS'],
+  ]) {
+    const region = page.getByRole('region', { name: regionName, exact: true });
+    const list = page.getByLabel(listName, { exact: true });
+    await expect(list).toHaveAttribute('data-expanded', 'false');
+    const initialHeight = await list.evaluate(el => el.clientHeight);
+    expect(initialHeight).toBeLessThanOrEqual(360);
+    expect(await list.evaluate(el => el.scrollHeight)).toBeGreaterThan(initialHeight);
+    await region.getByRole('button', { name: 'Xem tất cả', exact: true }).click();
+    await expect(list).toHaveAttribute('data-expanded', 'true');
+    expect(await list.evaluate(el => el.clientHeight)).toBeGreaterThan(initialHeight * 2);
+    await region.getByRole('button', { name: 'Thu gọn', exact: true }).click();
+    await expect(list).toHaveAttribute('data-expanded', 'false');
+    await expect.poll(() => list.evaluate(el => el.clientHeight)).toBe(initialHeight);
+    await expect.poll(() => board.evaluate(el => el.clientHeight)).toBe(initialBoardHeight);
+    await expect(region.getByRole('button', { name: 'Xem tất cả', exact: true })).toBeVisible();
+  }
+});
+
+test('hospital annual report waits for its background job and displays results without reloading', async ({ page, request }) => {
+  await request.get('http://127.0.0.1:3025/__test/admin');
+  let ready = false;
+  await page.route('**/api/reports/hospital?**', route => route.fulfill({ json: ready ? {
+    status: 'connected', metrics: { visits: 123, admissions: 0, discharges: 0, currentInpatients: 0, bedOccupancy: null, revenue: null }, trend: [], departments: [], breakdown: { routine: 123, emergency: 0 }, unavailable: {}, asOf: '2026-11-19T10:00:00', generatedAt: new Date().toISOString(),
+  } : { status: 'loading', message: 'Đang tổng hợp báo cáo năm từ HIS' } }));
+  await signIn(page);
+  await page.clock.install();
+  await page.goto('/reports/hospital');
+  await page.getByRole('combobox', { name: 'Thống kê', exact: true }).selectOption('year');
+  await expect(page.getByRole('status')).toContainText('Đang tổng hợp báo cáo năm');
+  await expect(page.locator('p[role="alert"]')).toHaveCount(0);
+  ready = true;
+  await page.clock.runFor(1100);
+  await expect(page.getByRole('article').first().getByText('123', { exact: true })).toBeVisible();
+  await expect(page.getByRole('status')).toHaveCount(0);
+});
+
+test('hospital daily report waits without a false stale snapshot and displays results automatically', async ({ page, request }) => {
+  await request.get('http://127.0.0.1:3025/__test/admin');
+  let ready = false;
+  await page.route('**/api/reports/hospital?**', route => route.fulfill({ json: ready ? {
+    status: 'connected', metrics: { visits: 123, admissions: 0, discharges: 0, currentInpatients: 0, bedOccupancy: null, revenue: null }, trend: [], departments: [], breakdown: { routine: 123, emergency: 0 }, unavailable: {}, asOf: '2026-11-19T10:00:00', generatedAt: new Date().toISOString(),
+  } : { status: 'loading', message: 'Đang tổng hợp báo cáo ngày từ HIS' } }));
+  await signIn(page);
+  await page.clock.install();
+  await page.goto('/reports/hospital');
+  await page.getByRole('combobox', { name: 'Thống kê', exact: true }).selectOption('day');
+  await expect(page.getByRole('status')).toContainText('Đang tổng hợp báo cáo ngày');
+  await expect(page.locator('p[role="alert"]')).toHaveCount(0);
+  await expect(page.getByText('Đang hiển thị bản trước', { exact: true })).toHaveCount(0);
+  ready = true;
+  await page.clock.runFor(1100);
+  await expect(page.getByRole('article').first().getByText('123', { exact: true })).toBeVisible();
+  await expect(page.getByRole('status')).toHaveCount(0);
+});
+
+test('hospital live report renders a changed snapshot as soon as the waiting response arrives', async ({ page, request }) => {
+  await request.get('http://127.0.0.1:3025/__test/admin');
+  let visits = 10;
+  let revision = 'a'.repeat(64);
+  let deliver: (() => void) | undefined;
+  const snapshot = () => ({ status: 'connected', revision, metrics: { visits, admissions: 0, discharges: 0, currentInpatients: 0, bedOccupancy: null, revenue: null }, trend: [], departments: [], breakdown: { routine: visits, emergency: 0 }, unavailable: {}, asOf: '2026-11-19T10:00:00', generatedAt: new Date().toISOString() });
+  await page.route('**/api/reports/hospital?**', async route => {
+    if (new URL(route.request().url()).searchParams.has('since')) {
+      await new Promise<void>(resolve => { deliver = resolve; });
+    }
+    await route.fulfill({ json: snapshot() }).catch(() => undefined);
+  });
+  await signIn(page);
+  await page.goto('/reports/hospital');
+  const card = page.getByRole('article').first();
+  await expect(card.getByText('10', { exact: true })).toBeVisible();
+  await expect.poll(() => typeof deliver).toBe('function');
+  visits = 20; revision = 'b'.repeat(64);
+  deliver!();
+  await expect(card.getByText('20', { exact: true })).toBeVisible({ timeout: 2000 });
+  await expect(page.getByText('Tự cập nhật', { exact: true })).toBeVisible();
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+test('hospital SQL report renders aggregates, changes periods and labels stale data on failure', async ({ page, request }) => {
+  await page.addInitScript(() => {
+    window.cspViolations = [];
+    document.addEventListener('securitypolicyviolation', event => {
+      window.cspViolations!.push(`${event.effectiveDirective}: ${event.blockedURI}`);
+    });
+  });
+  await request.get('http://127.0.0.1:3025/__test/admin');
+  let unavailable = false;
+  await page.route('**/api/reports/hospital?**', route => {
+    if (unavailable) return route.fulfill({ status: 503, json: { message: 'Không lấy được số liệu SQL' } });
+    const period = new URL(route.request().url()).searchParams.get('period');
+    const visits = period === 'year' ? 456 : 123;
+    return route.fulfill({ json: { status: 'connected', metrics: { visits, admissions: 9, discharges: 4, currentInpatients: 40, bedOccupancy: null, revenue: null }, asOf: '2026-11-19T10:00:00', generatedAt: new Date().toISOString(), cacheSeconds: 60, trend: [{ day: '2026-11-18', visits: 10, admissions: 2 }, { day: '2026-11-19', visits: visits - 10, admissions: 7 }], breakdown: { routine: visits - 3, emergency: 3 }, departments: [{ id: 1, name: 'Khoa kiểm thử', visits, admissions: 9, discharges: 4, currentInpatients: 40, revenue: null }], unavailable: { bedOccupancy: 'Chưa thống nhất', revenue: 'Chưa thống nhất' }, cls: { requested: 14, performed: 12, waiting: 2, trend: [{ day: '2026-11-18', requested: 6, performed: 5, waiting: 1 }, { day: '2026-11-19', requested: 8, performed: 7, waiting: 1 }], byServiceType: [{ name: 'Cận Lâm Sàng', requested: 10 }, { name: 'Thăm dò chức năng', requested: 4 }], byServiceGroup: [{ name: 'Xét nghiệm', requested: 10, performed: 8, waiting: 2 }] } } });
+  });
+  await signIn(page);
+  await page.goto('/reports/hospital');
+  await expect(page.getByRole('heading', { name: 'Báo cáo bệnh viện', exact: true })).toBeVisible();
+  const cspBaseline = await page.evaluate(() => window.cspViolations?.length ?? 0);
+  const visitsCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Lượt khám', exact: true }) });
+  await expect(visitsCard.getByText('123', { exact: true })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Biểu đồ lượt khám theo ngày' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Dịch vụ & khoa/phòng' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Chỉ định CLS theo ngày', exact: true }).locator('strong').first()).toContainText('14');
+  await expect(page.getByRole('rowheader', { name: 'Khoa kiểm thử', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Chưa có dữ liệu', { exact: true })).toHaveCount(2);
+  await page.getByRole('combobox', { name: 'Thống kê', exact: true }).selectOption('year');
+  await expect(visitsCard.getByText('456', { exact: true })).toBeVisible();
+  unavailable = true;
+  await page.getByRole('button', { name: /Tải lại/ }).click();
+  await expect(page.locator('p[role="status"]')).toContainText('Chưa cập nhật được số liệu mới');
+  await expect(visitsCard.getByText('456', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Chưa có dữ liệu', { exact: true })).toHaveCount(2);
+  unavailable = false;
+  await page.getByRole('button', { name: /Tải lại/ }).click();
+  await expect(visitsCard.getByText('456', { exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await page.evaluate(() => window.cspViolations?.length ?? 0)).toBe(cspBaseline);
+  // Check application behavior before collecting visual artifacts.
+  await page.setViewportSize({ width: 1400, height: 1000 });
+  await page.screenshot({ path: 'test-results/hospital-live-aggregates-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: 'test-results/hospital-live-aggregates-mobile.png', fullPage: true });
+});
 
 test('surface and button motion responds to interaction and respects reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });

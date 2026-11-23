@@ -57,6 +57,7 @@ type Capabilities = {
   automationExecution: boolean;
   shiftTaskGeneration: boolean;
   integrations: Record<string, boolean>;
+  hisReporting?: { configured: boolean; readOnly: boolean };
   surveyResponsesIdentified: boolean;
 };
 type ShiftTask = {
@@ -987,9 +988,9 @@ export default function ProgramsPage() {
 
   if (capabilities && !capabilities.enabled)
     return (
-      <main className="programs-page">
-        <header>
-          <h1>Nghiệp vụ chuyên sâu</h1>
+      <main className="dashboard-page programs-page">
+        <header className="page-header programs-heading">
+          <h1 className="page-title">Nghiệp vụ chuyên sâu</h1>
         </header>
         <section className="programs-notice">
           <h2>Chức năng hiện đang tắt</h2>
@@ -1001,10 +1002,10 @@ export default function ProgramsPage() {
     );
 
   return (
-    <main className="programs-page">
-      <header className="programs-heading">
+    <main className="dashboard-page programs-page">
+      <header className="page-header programs-heading">
         <div>
-          <h1>Nghiệp vụ chuyên sâu</h1>
+          <h1 className="page-title">Nghiệp vụ chuyên sâu</h1>
         </div>
         {canManage && capabilities?.enabled ? (
           <button
@@ -1090,12 +1091,26 @@ export default function ProgramsPage() {
           className="programs-integrations"
           aria-label={locale === "en" ? "Integration status" : "Trạng thái tích hợp"}
         >
-          <summary>{locale === "en" ? "External integrations" : "Tích hợp ngoài hệ thống"} <span>{locale === "en" ? "View connection status" : "Xem trạng thái kết nối"}</span></summary>
+          <summary>
+            {locale === "en" ? "External integrations" : "Tích hợp ngoài hệ thống"}
+            {capabilities.hisReporting?.configured ? (
+              <span className="programs-integration-summary is-configured">
+                {locale === "en" ? "HIS reporting · Read only" : "HIS báo cáo · Chỉ đọc"}
+              </span>
+            ) : null}
+          </summary>
           <div className="programs-integration-items">
+          {capabilities.hisReporting ? (
+            <span className={capabilities.hisReporting.configured ? "is-configured" : ""}>
+              {locale === "en" ? "HIS reporting" : "HIS báo cáo"}: {capabilities.hisReporting.configured
+                ? (locale === "en" ? "Configured · Read only" : "Đã cấu hình · Chỉ đọc")
+                : (locale === "en" ? "Not configured" : "Chưa cấu hình")}
+            </span>
+          ) : null}
           {Object.entries(capabilities.integrations).map(
             ([key, configured]) => (
               <span key={key} className={configured ? "is-configured" : ""}>
-                {integrationNames[key.toLowerCase()] ?? key}:{" "}
+                {key.toLowerCase() === "his" ? (locale === "en" ? "HIS workflow" : "HIS nghiệp vụ") : (integrationNames[key.toLowerCase()] ?? key)}:{" "}
                 {configured ? (locale === "en" ? "Configured" : "Đã cấu hình") : (locale === "en" ? "Not configured" : "Chưa cấu hình")}
               </span>
             ),

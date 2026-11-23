@@ -9,13 +9,17 @@ $node = (Get-Command node).Source
 if (!(Test-Path -LiteralPath $settingsPath)) { throw 'Configure the LAN runtime before deploying.' }
 $previousSettings = [IO.File]::ReadAllText($settingsPath)
 $build = '.next-work-release-' + [DateTime]::Now.ToString('yyyyMMdd-HHmmss-fff') + '-local'
-$environmentNames = @('CAREOPS_RELEASE', 'CAREOPS_WORK_DIST_DIR', 'CIRCLE_NODE_TOTAL')
+$environmentNames = @('CAREOPS_RELEASE', 'CAREOPS_WORK_DIST_DIR', 'CIRCLE_NODE_TOTAL', 'CAREOPS_DEPLOY_BUILD')
 $previousEnvironment = @{}
 foreach ($name in $environmentNames) { $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
 Push-Location $frontendRoot
 try {
+    # A successful frontend build cannot repair a stopped HTTPS gateway.
+    # Restore it before building or stopping the live frontend.
+    & $servicesScript -Action ensure-gateway
     $env:CAREOPS_RELEASE = 'work'
     $env:CAREOPS_WORK_DIST_DIR = $build
+    $env:CAREOPS_DEPLOY_BUILD = '1'
     # Limit static-generation workers on this 8 GB development machine.
     $env:CIRCLE_NODE_TOTAL = '3'
     Write-Output "Building current saved source into $build; the live build stays available."

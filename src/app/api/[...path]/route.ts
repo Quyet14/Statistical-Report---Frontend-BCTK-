@@ -165,7 +165,7 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
       body = new TextEncoder().encode(JSON.stringify(fields));
     }
     const upstream = await fetch(upstreamUrl, {
-      method: request.method, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(15000),
+      method: request.method, cache: "no-store", redirect: "error", signal: AbortSignal.any([request.signal, AbortSignal.timeout(endpoint === "reports/hospital" ? 30000 : 15000)]),
       headers: { "Content-Type": "application/json", Accept: "application/json", ...clientHeaders, ...(!isPublic && token ? { Authorization: `Bearer ${token}` } : {}) },
       body: body as BodyInit | undefined,
     });

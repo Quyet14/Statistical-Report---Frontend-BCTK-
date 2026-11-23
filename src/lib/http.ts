@@ -77,7 +77,13 @@ async function requestResponse(
     else if (response.status === 403) message = ["INVALID_REQUEST_ORIGIN", "UNTRUSTED_GATEWAY"].includes(code)
       ? "Địa chỉ truy cập chưa hợp lệ. Vui lòng mở địa chỉ HTTPS của hệ thống qua cổng gateway, rồi thử lại."
       : "Bạn không có quyền thực hiện thao tác này.";
-    else if (response.status >= 500) message = "Máy chủ chưa sẵn sàng. Vui lòng thử lại sau.";
+    else if (response.status >= 500) message = code === "HIS_BUSY"
+      ? "Nguồn báo cáo đang xử lý nhiều yêu cầu. Hệ thống sẽ tự thử lại."
+      : code === "HIS_QUERY_FAILED"
+        ? "Chưa lấy được số liệu từ HIS. Hệ thống sẽ tự thử lại; vui lòng kiểm tra kết nối HIS nếu lỗi kéo dài."
+        : code === "HIS_NOT_CONFIGURED"
+          ? "Nguồn HIS chưa được cấu hình đầy đủ tại backend."
+          : "Máy chủ chưa sẵn sàng. Vui lòng thử lại sau.";
     else if (response.status === 401 && path === "/auth/login") message = "Email hoặc mật khẩu không đúng.";
     else if (response.status === 401 && ["/auth/verify-login-otp", "/auth/reset-password"].includes(path)) message = "Mã xác minh không hợp lệ hoặc đã hết hạn. Vui lòng kiểm tra lại.";
     throw new ApiRequestError(message.slice(0, 2000), response.status, retryAt);

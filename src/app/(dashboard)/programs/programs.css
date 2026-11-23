@@ -1,8 +1,8 @@
 .programs-page{width:100%;min-width:0;margin:0 auto;padding:0;color:#17333d}
-.programs-heading{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem;padding:1.25rem 1.5rem;border:1px solid #d9e6ef;border-radius:1.25rem;background:linear-gradient(110deg,#fff,#eef6ff);box-shadow:0 8px 24px #04152b18}
+.programs-heading{display:flex;align-items:center;justify-content:space-between;gap:1rem}
 .programs-heading h1{color:#203e68;letter-spacing:-.035em;line-height:1.25}
 .programs-heading .primary-action{flex-shrink:0}
-.programs-heading h1{margin:.15rem 0;font-size:clamp(1.7rem,3vw,2.4rem)}
+.programs-heading h1{margin:.15rem 0;font-size:24px}
 .programs-heading p{margin:.35rem 0;color:#587078}
 .programs-eyebrow{font-size:.72rem!important;letter-spacing:.12em;font-weight:800;color:#087b68!important}
 .programs-tabs{display:flex;gap:.45rem;overflow:auto;padding:.55rem;margin-bottom:1rem;border:1px solid #dce7ee;border-radius:1rem;background:#f7faff;scrollbar-width:thin}
@@ -18,7 +18,8 @@
 .programs-alerts p{margin:.65rem 0;color:#6b5425}
 .programs-integrations{margin:0 0 1rem;padding:.85rem 1rem;border:1px solid #dce7e8;border-radius:1rem;background:#fff}
 .programs-integrations summary{cursor:pointer;font-weight:700;color:#35515a;line-height:1.6}
-.programs-integrations summary>span{margin-left:.75rem;padding:0;background:none;color:#61768d;font-weight:400;font-size:.8rem}
+.programs-integrations summary>.programs-integration-summary{display:inline-flex;align-items:center;gap:.4rem;margin-left:.75rem;padding:.2rem .6rem;font-size:.75rem;font-weight:650}
+.programs-integration-summary::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .programs-integration-items{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.8rem;padding-top:.8rem;border-top:1px solid #e8eef4}
 .programs-empty{display:flex;align-items:center;flex-direction:column;gap:.7rem;min-height:230px;justify-content:center;text-align:center;padding:2rem!important;box-shadow:0 8px 24px #04152b12}
 .programs-empty-icon{display:grid;place-items:center;width:54px;height:54px;border:1px solid #dce7fb;border-radius:16px;background:#eef4ff;color:#4774ce;font-size:28px}
@@ -26,7 +27,7 @@
 .programs-empty p{max-width:420px;margin:0;color:#637891;line-height:1.65}
 .programs-empty .primary-action{margin-top:.4rem}
 .programs-integrations strong{width:100%;color:#35515a}
-.programs-integrations span{padding:.25rem .5rem;border-radius:999px;background:#fff3dc;color:#815515;font-size:.78rem;font-weight:700}
+.programs-integrations span{padding:.3rem .65rem;border-radius:999px;background:#f0f3f8;color:#607189;font-size:.78rem;font-weight:650}
 .programs-integrations span.is-configured{background:#e2f5ee;color:#08704e}
 .programs-notice{margin-top:1rem;border-left:4px solid #e8a23a}
 .programs-warning{margin:.3rem 0 1rem;background:#fff9e9;color:#795819}
@@ -91,3 +92,17 @@
 .programs-survey-answer>div>span{display:block;height:100%;border-radius:inherit;background:#087b68}
 @media(max-width:680px){.programs-heading{align-items:flex-start;flex-direction:column;padding:1rem}.programs-heading .primary-action{width:100%}.programs-heading h1{font-size:1.65rem}.programs-two-columns{grid-template-columns:1fr}.programs-tabs{max-width:100%}.programs-integrations summary>span{display:block;margin-left:1rem}.programs-empty{padding:1.5rem 1rem!important}}
 @media(max-width:520px){.programs-okr-result{flex-direction:column}.programs-okr-result>label{width:100%}}
+@media(max-width:680px){
+  .programs-page .programs-heading{flex-direction:row;align-items:center;gap:.65rem}
+  .programs-page .programs-heading .primary-action{width:auto;min-height:42px;padding-inline:.85rem}
+  .programs-page .programs-heading h1{font-size:21px}
+  .programs-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.3rem;padding:.4rem;overflow:visible}
+  .programs-tabs button{min-width:0;min-height:42px;padding:.5rem .35rem;font-size:.82rem}
+  .programs-integrations summary>.programs-integration-summary{display:flex;width:fit-content;margin:.4rem 0 0 1rem}
+  .programs-card header,.programs-card footer,.programs-alerts>div{flex-wrap:wrap}
+}
+@media(prefers-reduced-motion:no-preference){
+  .programs-tabs button{transition:background-color .18s,color .18s,box-shadow .18s,transform .18s}
+  .programs-tabs button:hover{transform:translateY(-1px)}
+  .programs-tabs button:active{transform:translateY(0)}
+}

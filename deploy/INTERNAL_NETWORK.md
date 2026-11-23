@@ -87,6 +87,10 @@ Bản duyệt việc, việc lặp lại và báo cáo có hướng dẫn chuy�
 
 `npm run deploy:lan` build vào thư mục release riêng, chỉ thay frontend sau khi build xong; backend, Redis và nginx tiếp tục chạy. Nếu health không đạt, script khôi phục lựa chọn frontend trước đó. Sau khi thành công, tải lại trình duyệt một lần.
 
+Lệnh deploy đặt `CAREOPS_DEPLOY_BUILD=1` trong lúc build để không mở lời nhắc nâng cấp hoặc phiên coding agent tương tác. Biến này được khôi phục khi script kết thúc; build/dev thông thường vẫn giữ chính sách nhắc vá bảo mật của Next.js. Cập nhật dependency và kiểm thử trước khi deploy, không thực hiện nâng cấp ngay trong phiên deploy.
+
+Trước khi build, deploy kiểm tra cổng gateway và khởi động lại nginx nếu đã dừng. Bước này không dừng backend/Redis hoặc thay cấu hình firewall. Có thể gọi riêng `./scripts/lan-services.ps1 -Action ensure-gateway`; nếu tiến trình nginx được quản lý vẫn chạy nhưng không lắng nghe, công cụ yêu cầu kiểm tra log thay vì mở thêm một tiến trình.
+
 Chỉ dùng launcher cho bộ LAN; không chạy thêm backend `npm run start:dev` trên cùng cổng 3310. Launcher từ chối start khi cổng đã bị chiếm và không tự dừng tiến trình ngoài quản lý. Kiểm tra trạng thái bằng `./scripts/lan-services.ps1 -Action status` và health bằng `node scripts/check-lan.cjs`.
 
 Có thể dừng/chạy riêng bằng `-Action stop -Service frontend` rồi `-Action start -Service frontend`; tương tự với `-Service backend`. Chỉ dùng khi đã có bộ LAN được quản lý; không thay cấu hình release khi dịch vụ đó còn đang chạy.

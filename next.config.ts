@@ -9,6 +9,10 @@ if (
 }
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Deployment must finish without launching an interactive upgrade agent.
+    agentUpgrade: process.env.CAREOPS_DEPLOY_BUILD === "1" ? false : "security",
+  },
   distDir:
     process.env.CAREOPS_RELEASE === "organization"
       ? ".next-organization-release"

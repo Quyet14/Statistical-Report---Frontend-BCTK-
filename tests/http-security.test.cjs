@@ -32,6 +32,13 @@ test('server errors do not display internal database diagnostics', async () => {
   const { requestJson } = tsLoader({ fetch: async () => Response.json({ message: 'SQL password=secret' }, { status: 500 }) })('src/lib/http.ts');
   await assert.rejects(requestJson('/tasks'), error => error.status === 500 && !error.message.includes('secret'));
 });
+
+test('HIS failures explain the source problem without exposing server diagnostics', async () => {
+  for (const code of ['HIS_BUSY', 'HIS_QUERY_FAILED', 'HIS_NOT_CONFIGURED']) {
+    const { requestJson } = tsLoader({ fetch: async () => Response.json({ code, message: 'SQL password=secret' }, { status: 503 }) })('src/lib/http.ts');
+    await assert.rejects(requestJson('/reports/hospital'), error => error.status === 503 && !error.message.includes('secret') && error.message !== 'Máy chủ chưa sẵn sàng. Vui lòng thử lại sau.');
+  }
+});
 test('API browser transport uses cookies and never reads tokens from storage', async () => {
   const { api } = tsLoader({ window: { localStorage: { getItem() { throw new Error('Token storage must not be read'); } } }, fetch: async (url, options) => { assert.equal(url, '/api/users'); assert.equal(options.credentials, 'same-origin'); assert.equal(options.headers.Authorization, undefined); return Response.json([]); } })('src/lib/api/index.ts');
   assert.equal((await api.get('/users')).length, 0);

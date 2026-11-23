@@ -45,6 +45,7 @@ const menuItems = [
   { key: "/programs", label: "SOP, trực & chất lượng", icon: FileProtectOutlined },
   { key: "/notifications", label: "Trung tâm thông báo", icon: InboxOutlined },
   { key: "/reports", label: "Giao ban", icon: BarChartOutlined },
+  { key: "/reports/hospital", label: "Báo cáo bệnh viện", icon: BarChartOutlined },
   { key: "/kpi", label: "KPI", icon: RiseOutlined },
   { key: "/employees", label: "Quản lý nhân viên", icon: TeamOutlined },
   { key: "/departments", label: "Quản lý khoa/phòng", icon: ApartmentOutlined },
@@ -62,6 +63,7 @@ const menuTranslationKeys: Record<string, Parameters<ReturnType<typeof useLocale
   "/programs": "nav.programs",
   "/notifications": "nav.notifications",
   "/reports": "nav.reports",
+  "/reports/hospital": "nav.hospitalReports",
   "/kpi": "nav.kpi",
   "/employees": "nav.employees",
   "/departments": "nav.departments",
@@ -89,7 +91,7 @@ const menuGroups = [
     id: "management",
     label: "Quản lý",
     icon: SettingOutlined,
-    keys: ["/reports", "/kpi", "/employees", "/departments", "/organization", "/settings/operations"],
+    keys: ["/reports", "/reports/hospital", "/kpi", "/employees", "/departments", "/organization", "/settings/operations"],
   },
 ];
 
@@ -158,6 +160,9 @@ export function AppSidebar() {
   const visibleItems = menuItems.filter((item) =>
     canAccessRoute(role, item.key),
   );
+  const activeItem = visibleItems
+    .filter(item => pathname === item.key || pathname.startsWith(`${item.key}/`))
+    .sort((a, b) => b.key.length - a.key.length)[0]?.key;
 
   const savePreferences = (next: SidebarPreferences) => {
     setPreferences(next);
@@ -265,9 +270,7 @@ export function AppSidebar() {
                   hidden={!isOpen}
                 >
                   {items.map((item) => {
-                    const isActive =
-                      pathname === item.key ||
-                      pathname.startsWith(`${item.key}/`);
+                    const isActive = activeItem === item.key;
 
                     return (
                       <Link
