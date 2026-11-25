@@ -45,15 +45,58 @@ function ChartEmpty({ text = "Chưa có dữ liệu biểu đồ" }: { text?: st
   return <div className={s.empty}><BarChartOutlined /><span>{text}</span></div>;
 }
 
+function CombinedClsChart({ cls, period }: { cls: NonNullable<HospitalData["cls"]>; period: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const id = useId();
+  const options = [
+    { key: "requested" as const, label: "Chỉ định", total: cls.requested, tone: "violet" },
+    { key: "performed" as const, label: "Đã thực hiện", total: cls.performed, tone: "mint" },
+    { key: "waiting" as const, label: "Chờ kết quả", total: cls.waiting, tone: "amber" },
+  ];
+  return <section className={`${s.card} ${s.clsCombined}`} data-tone="violet" data-expanded={expanded} aria-labelledby={id}>
+    <header className={s.heading}>
+      <span className={s.icon}><LineChartOutlined /></span>
+      <div><h3 id={id}>Tình hình CLS</h3><p>{period} · Chỉ định, thực hiện và chờ kết quả</p></div>
+      <button type="button" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded} aria-label={`${expanded ? "Thu gọn" : "Mở rộng"} tình hình CLS`}>{expanded ? <CompressOutlined /> : <ExpandOutlined />}</button>
+    </header>
+    <div className={s.body}>
+      <div className={s.clsOverview}>
+        {options.map((option) => <section className={s.clsSeries} data-tone={option.tone} key={option.key} aria-label={`CLS ${option.label.toLowerCase()}`}>
+          <h4>{option.label}<strong>{n(option.total)}</strong></h4>
+          <SeriesChart
+            points={cls.trend.map((point) => ({ day: point.day, value: point[option.key] }))}
+            label={`Biểu đồ ${option.label.toLowerCase()} CLS theo ngày`}
+            kind={option.key === "performed" ? "column" : "line"}
+          />
+        </section>)}
+      </div>
+    </div>
+  </section>;
+}
+
 function ChartData({ rows, unit }: { rows: Row[]; unit: string }) {
   return <details className={s.data}><summary>Xem số liệu đầy đủ <span>{rows.length} mục</span></summary><div className={s.dataScroll}><table><caption>Số liệu biểu đồ ({unit})</caption><thead><tr><th scope="col">Mục</th><th scope="col">{unit}</th></tr></thead><tbody>{rows.map((r, i) => <tr key={`${r.name}:${i}`}><th scope="row">{r.name}</th><td>{n(r.value)}</td></tr>)}</tbody></table></div></details>;
 }
 
-function Bars({ rows, unit = "lượt", limit = 5 }: { rows: Row[]; unit?: string; limit?: number }) {
+function Bars({ rows, unit = "lượt", limit = 5, compact = false, showData = true }: { rows: Row[]; unit?: string; limit?: number; compact?: boolean; showData?: boolean }) {
   if (!rows.length) return <ChartEmpty />;
   const ordered = [...rows].sort((a, b) => b.value - a.value);
   const max = Math.max(1, ...ordered.map(r => Math.abs(r.value)));
-  return <><ol className={s.bars}>{ordered.slice(0, limit).map((r, i) => <li key={`${r.name}:${i}`}><div><span title={r.name}>{r.name}</span><strong title={`${n(r.value)} ${unit}`}>{unit === "VNĐ" ? short(r.value) : n(r.value)}</strong></div><progress max={max} value={Math.abs(r.value)} aria-label={`${r.name}: ${n(r.value)} ${unit}`} /></li>)}</ol><ChartData rows={ordered} unit={unit} /></>;
+  return <><ol className={`${s.bars} ${compact ? s.compactBars : ""}`}>{ordered.slice(0, limit).map((r, i) => <li key={`${r.name}:${i}`}><div><span title={r.name}>{r.name}</span><strong title={`${n(r.value)} ${unit}`}>{unit === "VNĐ" ? short(r.value) : n(r.value)}</strong></div><progress max={max} value={Math.abs(r.value)} aria-label={`${r.name}: ${n(r.value)} ${unit}`} /></li>)}</ol>{showData && <ChartData rows={ordered} unit={unit} />}</>;
+}
+
+function PharmacyStatus({ rows }: { rows: { name: string; prescriptions: number; dispensed: number; waiting: number }[] }) {
+  const max = Math.max(1, ...rows.map((row) => row.prescriptions));
+  return <div className={s.pharmacyStatus}>
+    <div className={s.pharmacyLegend}><span><i className={s.dispensedDot} />Đã phát</span><span><i className={s.waitingDot} />Chờ phát</span></div>
+    {rows.map((row) => <div className={s.pharmacyRow} key={row.name}>
+      <div className={s.pharmacyLabel}><span>{row.name}</span><strong>{n(row.prescriptions)} toa</strong></div>
+      <div className={s.pharmacyTrack} role="img" aria-label={`${row.name}: đã phát ${n(row.dispensed)}, chờ phát ${n(row.waiting)}, tổng ${n(row.prescriptions)}`}>
+        <span className={s.pharmacyDispensed} style={{ width: `${row.prescriptions ? row.dispensed / max * 100 : 0}%` }}>{row.dispensed > 0 ? n(row.dispensed) : ""}</span>
+        <span className={s.pharmacyWaiting} style={{ width: `${row.prescriptions ? row.waiting / max * 100 : 0}%` }}>{row.waiting > 0 ? n(row.waiting) : ""}</span>
+      </div>
+    </div>)}
+  </div>;
 }
 
 function Ring({ value, total, caption, center }: { value: number; total: number; caption: string; center: string }) {
@@ -62,7 +105,9 @@ function Ring({ value, total, caption, center }: { value: number; total: number;
 }
 
 type HospitalData = {
-  cls?: { trend: { day: string; requested: number; performed: number; waiting: number }[] };
+  cls?: { requested: number; performed: number; waiting: number; trend: { day: string; requested: number; performed: number; waiting: number }[] };
+  pharmacy?: { prescriptions: number; dispensed: number; waiting: number; categories: { name: string; prescriptions: number; dispensed: number; waiting: number }[]; trend: { day: string; prescriptions: number; dispensed: number }[] };
+  fptSummary?: { source: "fpt-dashboard"; reportDate: string; visits: number; emergency: number; inpatients: number; revenue: number };
   metrics: { visits: number; admissions: number; discharges: number; currentInpatients: number; revenue: number | null; bedOccupancy: number | null };
   trend: { day: string; visits: number; admissions: number }[];
   departments: { name: string; discharges: number; currentInpatients: number }[];
@@ -72,6 +117,12 @@ type HospitalData = {
 };
 
 export function HospitalCharts({ data, period, section }: { data: HospitalData | null; period: string; section: "clinical" | "cls" }) {
+  const revenueRows = data?.cash && data.metrics.revenue != null ? [
+    ...(data.fptSummary ? [{ name: "Tổng doanh thu", value: data.fptSummary.revenue }] : []),
+    { name: "Đã thu", value: data.cash.collected },
+    { name: "Hoàn trả", value: data.cash.refunded },
+    { name: "Thực thu sau hoàn trả", value: data.metrics.revenue },
+  ] : [];
   return <div className={`${s.group} ${s.embedded}`} role="group" aria-label={section === "clinical" ? "Biểu đồ hoạt động khoa/phòng" : "Biểu đồ dịch vụ CLS"}>
     <div className={section === "clinical" ? s.departmentGrid : s.serviceGrid}>
       {section === "clinical" ? <>
@@ -81,11 +132,10 @@ export function HospitalCharts({ data, period, section }: { data: HospitalData |
     <ChartCard title="Xuất viện theo khoa" subtitle={`${data ? n(data.metrics.discharges) : "—"} lượt trong kỳ`} tone="mint" icon="bar">{data ? <Bars rows={data.departments.map(d => ({ name: d.name, value: d.discharges }))} /> : <ChartEmpty />}</ChartCard>
     <ChartCard title="Cơ cấu lượt khám" subtitle="Khám thường và cấp cứu" tone="violet" icon="ring">{data ? <><Ring value={data.breakdown.routine} total={data.metrics.visits} center={short(data.metrics.visits)} caption="phiếu khám" /><div className={s.keyValues}><span><i />Khám thường <b>{n(data.breakdown.routine)}</b></span><span><i />Cấp cứu <b>{n(data.breakdown.emergency)}</b></span></div><ChartData rows={[{ name: "Khám thường", value: data.breakdown.routine }, { name: "Cấp cứu", value: data.breakdown.emergency }]} unit="phiếu khám" /></> : <ChartEmpty />}</ChartCard>
     <ChartCard title="Sử dụng giường bệnh" subtitle="Trạng thái hiện tại trong HIS" tone="amber" icon="ring">{data?.bedSnapshot && data.metrics.bedOccupancy != null ? <><Ring value={data.bedSnapshot.occupied} total={data.bedSnapshot.active} center={`${n(data.metrics.bedOccupancy)}%`} caption="giường đang dùng" /><div className={s.keyValues}><span><i />Đang dùng <b>{n(data.bedSnapshot.occupied)}</b></span><span><i />Còn trống <b>{n(Math.max(0, data.bedSnapshot.active - data.bedSnapshot.occupied))}</b></span></div><p className={s.note}>{n(data.bedSnapshot.active)} giường hoạt động · {data.bedSnapshot.asOf.replace("T", " ")}</p></> : <ChartEmpty />}</ChartCard>
-    <ChartCard title="Thu và hoàn trả" subtitle="VNĐ · gồm tạm ứng, đã trừ hoàn" tone="cyan" icon="bar">{data?.cash && data.metrics.revenue != null && data.cash.invalid === 0 ? <><div className={s.readout}><span>Thực thu</span><strong title={`${n(data.metrics.revenue)} VNĐ`}>{short(data.metrics.revenue)}</strong></div><Bars rows={[{ name: "Đã thu", value: data.cash.collected }, { name: "Hoàn trả", value: data.cash.refunded }, { name: "Thực thu", value: data.metrics.revenue }]} unit="VNĐ" /></> : <ChartEmpty />}</ChartCard>
+    <ChartCard title="Doanh thu và hoàn trả" subtitle="Tổng doanh thu · đã thu · hoàn trả · thực thu" tone="cyan" icon="bar">{data?.cash && data.metrics.revenue != null && data.cash.invalid === 0 ? <><div className={s.readout}><span>Thực thu sau hoàn trả</span><strong title={`${n(data.metrics.revenue)} VNĐ`}>{short(data.metrics.revenue)}</strong></div><Bars compact showData={false} rows={revenueRows.slice(0, -1)} unit="VNĐ" /><ChartData rows={revenueRows} unit="VNĐ" /></> : <ChartEmpty />}</ChartCard>
       </> : <>
-      <ChartCard title="Chỉ định CLS theo ngày" subtitle={period} tone="violet">{data?.cls ? <SeriesChart points={data.cls.trend.map(p => ({ day: p.day, value: p.requested }))} label="Biểu đồ chỉ định CLS theo ngày" /> : <ChartEmpty />}</ChartCard>
-      <ChartCard title="CLS đã thực hiện" subtitle={period} tone="mint">{data?.cls ? <SeriesChart points={data.cls.trend.map(p => ({ day: p.day, value: p.performed }))} kind="column" label="Biểu đồ CLS đã thực hiện theo ngày" /> : <ChartEmpty />}</ChartCard>
-      <ChartCard title="CLS chờ kết quả" subtitle={period} tone="amber">{data?.cls ? <SeriesChart points={data.cls.trend.map(p => ({ day: p.day, value: p.waiting }))} label="Biểu đồ CLS chờ kết quả theo ngày" /> : <ChartEmpty />}</ChartCard>
+      {data?.cls ? <CombinedClsChart cls={data.cls} period={period} /> : <ChartCard title="Tình hình CLS" subtitle={period} tone="violet"><ChartEmpty /></ChartCard>}
+      <ChartCard title="Tình hình phát thuốc" subtitle="Tổng toa theo nguồn kê" tone="cyan" icon="bar">{data?.pharmacy ? <><PharmacyStatus rows={data.pharmacy.categories} /><ChartData rows={data.pharmacy.categories.flatMap((row) => [{ name: `${row.name} - Đã phát`, value: row.dispensed }, { name: `${row.name} - Chờ phát`, value: row.waiting }])} unit="toa" /></> : <ChartEmpty />}</ChartCard>
       </>}
     </div>
   </div>;

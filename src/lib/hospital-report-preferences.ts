@@ -9,10 +9,16 @@ export function validHospitalReportFilters(value: unknown): value is HospitalRep
 }
 
 export function readHospitalReportFilters(storage: Pick<Storage, "getItem">, key: string, fallback: HospitalReportFilters): HospitalReportFilters {
+  return readHospitalReportSelection(storage, key, fallback).filters;
+}
+
+export function readHospitalReportSelection(storage: Pick<Storage, "getItem">, key: string, fallback: HospitalReportFilters) {
   try {
     const saved: unknown = JSON.parse(storage.getItem(key) ?? "null");
-    return validHospitalReportFilters(saved) ? { period: saved.period, date: saved.date } : fallback;
-  } catch { return fallback; }
+    return validHospitalReportFilters(saved)
+      ? { filters: { period: saved.period, date: saved.date }, manual: true }
+      : { filters: fallback, manual: false };
+  } catch { return { filters: fallback, manual: false }; }
 }
 
 export function saveHospitalReportFilters(storage: Pick<Storage, "setItem">, key: string, filters: HospitalReportFilters) {

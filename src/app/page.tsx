@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Be_Vietnam_Pro } from "next/font/google";
 import s from "./welcome.module.css";
 import Showcase, { type Item } from "./Showcase";
+import ScrollFX from "./ScrollFX";
 
 const font = Be_Vietnam_Pro({ subsets: ["vietnamese", "latin"], weight: ["400", "500", "600", "700", "800"], display: "swap" });
 
@@ -52,6 +53,7 @@ const faces = ["✚", "✓", "▥", "⌘", "✧", "↗"];
 export default function HomePage() {
   return (
     <main className={`${s.welcome} ${font.className}`}>
+      <ScrollFX />
       <a className={s.skip} href="#noi-dung">Đến nội dung chính</a>
       <header className={s.header}>
         <Link href="/" className={s.brand} aria-label="HuuNghi CareOps, Trang chủ"><Image src="/hospital-logo.png" alt="" width={44} height={44} priority /><span>HuuNghi <b>CareOps</b><small>Bệnh viện Hữu Nghị</small></span></Link>

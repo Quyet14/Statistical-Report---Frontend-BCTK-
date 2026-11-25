@@ -9,6 +9,30 @@
 @media(hover:hover) and (prefers-reduced-motion:no-preference){.controls button:hover,.feedHeading button:hover{border-color:#93b2dc;background:#edf5ff;transform:translateY(-1px)}}
 .board{background:#0e1729;border-color:#29364f;border-radius:14px;box-shadow:none}.heading{background:linear-gradient(110deg,#142039,#101a2d);border-color:#29364f;padding:14px 16px}.heading h2{color:#e0eafa;font-size:16px}.columns{padding:11px;gap:11px}.feed{background:#101a2d;border-color:#2b3750;border-radius:11px;box-shadow:none}.feedHeading{background:#152039;border-color:#2b3750;min-height:50px;padding:10px 12px}.feedHeading h3{color:#cedbf0;font-size:12px}.feedHeading>span,.interval{color:#91a4c1}.controls button,.feedHeading button{background:#1a2a44;border-color:#364d6d;color:#c6dbf8;box-shadow:0 2px 0 #080e1d}.controls button[aria-pressed=true]{background:#163b43;border-color:#2d6967;color:#8cf1d7}.status{color:#8ccebb}.status[data-stale=true]{color:#edc183}.table thead th{background:#1a2942;color:#b6cbea;border-color:#2b3b55}.table th,.table td{color:#afc1dc;border-color:#24324b}.table tbody th{color:#d0def2}.table tbody tr:nth-child(even){background:#142037}.table tbody tr:hover{background:#1c304b}.viewport{scrollbar-color:#395276 transparent;height:clamp(300px,39vh,400px)}.services li{background:linear-gradient(110deg,#1b2340,#15233b);border-color:#303d5a;border-left-color:#9583ef}.serviceTitle strong{color:#d0ddf2}.serviceTitle>span{color:#b4a5f0}.serviceNumbers [data-tone=mint]{color:#6ddcbb}.serviceNumbers [data-tone=amber]{color:#e8bd75}.empty{color:#96a9c6}
 @media(max-width:680px){.viewport{height:310px}}
+/* Compact board header: smaller bar height, clearer title and controls. */
+.board .heading{min-height:44px;padding:7px 12px;gap:12px}
+.board .heading h2{margin:0;font-size:15px;line-height:1.25;font-weight:800;letter-spacing:-.01em}
+.board .controls{gap:8px}
+.board .controls button{min-height:30px;padding:6px 9px;font-size:11px}
+.board .status{font-size:11px;white-space:nowrap}
+.board .interval{font-size:11px;white-space:nowrap}
+.board .feedHeading h3{font-size:15px}
+.board .feedHeading>span{font-size:12px}
+.board .feedHeading button{font-size:12px;min-height:34px}
+.board .table{font-size:13px}
+.board .table th,.board .table td{padding:12px 9px}
+.board .table thead th{font-size:12px}
+.board .table tbody th{font-size:12px;min-width:110px}
+.board .serviceTitle strong{font-size:14px}
+.board .serviceTitle>span{font-size:12px}
+.board .serviceNumbers{font-size:12px}
+.board .services li{padding:12px}
+@media(max-width:900px){.board .heading{align-items:flex-start;flex-direction:column;min-height:0;padding:8px 10px}.board .heading h2{font-size:15px}.board .controls{width:100%;gap:7px}.board .status,.board .interval,.board .controls button{font-size:11px}.board .feedHeading h3{font-size:14px}.board .table{font-size:12px}.board .table thead th{font-size:11px}.board .table tbody th{font-size:11px}.board .serviceTitle strong{font-size:13px}.board .serviceNumbers{font-size:11px}}
+.departmentFeed,.serviceFeed{align-self:stretch}
+.departmentFeed>.feed,.serviceFeed>.feed{height:100%}
+.departmentFeed .viewport,.serviceFeed .viewport{height:0;min-height:0;max-height:none;flex:1}
+@media(max-width:1100px){.departmentFeed .viewport{height:250px;flex:none}}
+@media(max-width:680px){.departmentFeed .viewport{height:280px}.serviceFeed .viewport{height:310px;flex:none}}
 @media(hover:hover){.controls button:hover,.feedHeading button:hover{background:#243d5d;color:#f0f6ff;border-color:#587ca4}}
 .viewport{height:280px}.heading{padding:10px 13px}.feedHeading{min-height:44px;padding:8px 11px}@media(max-width:680px){.viewport{height:310px}}
 /* Related information shares the same row instead of separate full-width blocks. */

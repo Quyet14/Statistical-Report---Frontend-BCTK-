@@ -1,6 +1,36 @@
 import { test, expect, type Page } from '@playwright/test';
 declare global { interface Window { cspViolations?: string[] } }
 
+test('hospital follows today until the user explicitly pins a date', async ({page,request}) => {
+  test.setTimeout(90000);
+  await request.get('http://127.0.0.1:3025/__test/admin');
+  await page.route('**/api/reports/hospital?**',route=>route.fulfill({json:{status:'disabled',message:'Fixture disabled'}}));
+  await signIn(page);
+  const keepSessionActive=()=>page.evaluate(()=>{
+    localStorage.setItem('careops-last-activity',String(Date.now()));
+    localStorage.setItem('careops-last-renewal',String(Date.now()));
+    window.dispatchEvent(new Event('focus'));
+  });
+  await page.clock.setFixedTime(new Date('2026-11-25T16:59:58Z'));
+  await keepSessionActive();
+  await page.goto('/reports/hospital');
+  const date=page.getByLabel('Ngày tham chiếu',{exact:true});
+  await expect(page.getByRole('combobox',{name:'Thống kê',exact:true})).toHaveValue('day');
+  await expect(date).toHaveValue('2026-11-25');
+  await page.clock.setFixedTime(new Date('2026-11-25T17:00:02Z'));
+  await keepSessionActive();
+  await expect(date).toHaveValue('2026-11-26');
+  await page.goto('/employees');
+  await page.goto('/reports/hospital');
+  await expect(date).toHaveValue('2026-11-26');
+  await date.fill('2026-11-20');
+  await page.clock.setFixedTime(new Date('2026-11-26T17:00:02Z'));
+  await keepSessionActive();
+  await expect(date).toHaveValue('2026-11-20');
+  await page.reload();
+  await expect(date).toHaveValue('2026-11-20');
+});
+
 test('hospital preserves the original layout while displaying corrected source values', async ({page,request}) => {
   await request.get('http://127.0.0.1:3025/__test/admin');
   let visits=1756;

@@ -1,7 +1,20 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { tsLoader } = require('./helpers/ts-loader.cjs');
-const { readHospitalReportFilters, saveHospitalReportFilters } = tsLoader()('src/lib/hospital-report-preferences.ts');
+const { readHospitalReportFilters, readHospitalReportSelection, saveHospitalReportFilters } = tsLoader()('src/lib/hospital-report-preferences.ts');
+
+test('only an explicit saved selection pins the date; defaults follow each new day', () => {
+  const values = new Map();
+  const storage = { getItem: key => values.get(key) ?? null, setItem: (key,value) => values.set(key,value) };
+  const first={period:'day',date:'2026-11-25'},next={period:'day',date:'2026-11-26'};
+  assert.equal(readHospitalReportSelection(storage,'account',first).manual,false);
+  assert.equal(readHospitalReportSelection(storage,'account',next).filters.date,'2026-11-26');
+  assert.equal(values.size,0);
+  saveHospitalReportFilters(storage,'account',first);
+  const saved=readHospitalReportSelection(storage,'account',next);
+  assert.equal(saved.manual,true);
+  assert.equal(saved.filters.date,'2026-11-25');
+});
 
 test('hospital report filters survive reopening and stay separate for each account', () => {
   const values = new Map();

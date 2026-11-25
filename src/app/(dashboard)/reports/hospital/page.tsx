@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { requestJson } from "@/lib/http";
 import { getStoredUser } from "@/lib/session";
-import { readHospitalReportFilters, saveHospitalReportFilters } from "@/lib/hospital-report-preferences";
+import { readHospitalReportSelection, saveHospitalReportFilters } from "@/lib/hospital-report-preferences";
 import { BarChartOutlined, DatabaseOutlined, CalendarOutlined, TeamOutlined, LoginOutlined, LogoutOutlined, HeartOutlined, DollarOutlined, ReloadOutlined } from "@ant-design/icons";
 import styles from "./page.module.css";
 import { HospitalCharts } from "./HospitalCharts";
@@ -19,14 +19,15 @@ type ClsReport = {
   byServiceType: { name: string; requested: number }[];
   byServiceGroup: { name: string; requested: number; performed: number; waiting: number }[];
 };
-type Report = { status: "connected"; metrics: Metrics; asOf: string; generatedAt: string; cacheSeconds: number; fptSummary?: FptSummary; bedSnapshot?: { active: number; occupied: number; asOf: string }; cash?: { collected: number; refunded: number; invalid: number }; trend: { day: string; visits: number; admissions: number }[]; breakdown: { routine: number; emergency: number }; departments: ({ id: number | null; name: string } & Omit<Metrics, "bedOccupancy">)[]; unavailable: Record<string, string>; cls?: ClsReport } | { status: "disabled" | "loading"; message: string };
+type PharmacyReport = { prescriptions: number; dispensed: number; waiting: number; categories: { name: string; prescriptions: number; dispensed: number; waiting: number }[]; trend: { day: string; prescriptions: number; dispensed: number }[] };
+type Report = { status: "connected"; metrics: Metrics; asOf: string; generatedAt: string; cacheSeconds: number; fptSummary?: FptSummary; bedSnapshot?: { active: number; occupied: number; asOf: string }; cash?: { collected: number; refunded: number; invalid: number }; trend: { day: string; visits: number; admissions: number }[]; breakdown: { routine: number; emergency: number }; departments: ({ id: number | null; name: string } & Omit<Metrics, "bedOccupancy">)[]; unavailable: Record<string, string>; cls?: ClsReport; pharmacy?: PharmacyReport } | { status: "disabled" | "loading"; message: string };
 const indicators = [
   { key: "visits", label: "Lượt khám", unit: "phiếu khám", icon: TeamOutlined, tone: "blue", definition: "Số phiếu KhamBenh theo ngày khám; không phải số người duy nhất." },
   { key: "admissions", label: "Nhập viện", unit: "lượt", icon: LoginOutlined, tone: "purple", definition: "Bệnh án có phiếu nhập viện, theo ngày vào viện." },
   { key: "discharges", label: "Xuất viện", unit: "lượt", icon: LogoutOutlined, tone: "green", definition: "Bệnh án có phiếu nhập viện, theo ngày ra viện." },
   { key: "currentInpatients", label: "Đang điều trị", unit: "bệnh án", icon: HeartOutlined, tone: "pink", definition: "Bệnh án chưa ra viện tại thời điểm chốt số liệu; không phải tổng nhập viện trong kỳ." },
   { key: "bedOccupancy", label: "Công suất giường", unit: "%", icon: BarChartOutlined, tone: "orange", definition: "Tỷ lệ giường đang dùng trên giường không tạm ngưng trong danh mục HIS, tại thời điểm hiện tại; không phải công suất bình quân theo kỳ." },
-  { key: "revenue", label: "Thực thu", unit: "VNĐ", icon: DollarOutlined, tone: "teal", definition: "Chứng từ đã thanh toán, không hủy trong HIS, gồm tạm ứng, trừ hoàn trả; phân theo nơi lập chứng từ, không phải doanh thu dịch vụ." },
+  { key: "revenue", label: "Tổng doanh thu", unit: "VNĐ", icon: DollarOutlined, tone: "teal", definition: "Doanh thu từ bảng tổng hợp tham chiếu FPT cho kỳ trong ngày; khi thống kê theo tháng/năm sẽ hiển thị thực thu đã tính từ HIS." },
 ] as const;
 const number = (value: number | null | undefined) => value == null ? "—" : new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(value);
 const cashValue = (value: number | null | undefined) => value == null ? "—" : Math.abs(value) >= 1e9 ? `${number(value / 1e9)} tỷ` : Math.abs(value) >= 1e6 ? `${number(value / 1e6)} triệu` : number(value);
@@ -36,21 +37,37 @@ export default function HospitalReportsPage() {
   const [period, setPeriod] = useState("day");
   const [date, setDate] = useState(today);
   const [filtersReady, setFiltersReady] = useState(false);
+  const [manualSelection, setManualSelection] = useState(false);
   const preferenceKey = `careops.hospital-report.filters.v1:${getStoredUser()?.id ?? "guest"}`;
   useEffect(() => {
     let active = true;
-    let saved = { period: "month", date: today() };
-    try { saved = readHospitalReportFilters(window.localStorage, preferenceKey, saved); } catch { /* Browser storage may be disabled. */ }
+    let saved = { filters: { period: "day", date: today() }, manual: false };
+    try { saved = readHospitalReportSelection(window.localStorage, preferenceKey, saved.filters); } catch { /* Browser storage may be disabled. */ }
     queueMicrotask(() => {
       if (!active) return;
-      setPeriod(saved.period); setDate(saved.date); setFiltersReady(true);
+      setPeriod(saved.filters.period); setDate(saved.filters.date); setManualSelection(saved.manual); setFiltersReady(true);
     });
     return () => { active = false; };
   }, [preferenceKey]);
   const changeFilters = (nextPeriod: string, nextDate: string) => {
+    setManualSelection(true);
     setPeriod(nextPeriod); setDate(nextDate);
     try { saveHospitalReportFilters(window.localStorage, preferenceKey, { period: nextPeriod, date: nextDate }); } catch { /* Keep the current selection when storage is unavailable. */ }
   };
+  useEffect(() => {
+    if (!filtersReady || manualSelection) return;
+    const followToday = () => {
+      if (!document.hidden) setDate(current => current === today() ? current : today());
+    };
+    const timer = window.setInterval(followToday, 1000);
+    window.addEventListener("focus", followToday);
+    document.addEventListener("visibilitychange", followToday);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", followToday);
+      document.removeEventListener("visibilitychange", followToday);
+    };
+  }, [filtersReady, manualSelection]);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
   const [result, setResult] = useState<{ key: string; data?: Report; error?: string } | null>(null);
@@ -138,13 +155,14 @@ export default function HospitalReportsPage() {
     {indicators.map(item => {
       const value = item.key === "visits" ? fptSummary?.visits ?? data?.metrics.visits
         : item.key === "currentInpatients" ? fptSummary?.inpatients ?? data?.metrics.currentInpatients
+        : item.key === "revenue" ? fptSummary?.revenue ?? data?.metrics.revenue
         : data?.metrics[item.key];
       return <article className={styles.metric} key={item.key} data-tone={item.tone} title={data?.unavailable[item.key] || item.definition}>
         <div className={styles.metricTop}><span className={styles.metricIcon}><item.icon /></span><span className={styles.metricUnit}>{item.unit}</span></div>
-        <h3>{item.label}</h3><div className={styles.metricValue} aria-label={value == null ? "Chưa có dữ liệu" : undefined} title={item.key === "revenue" ? `${number(value)} VNĐ` : undefined}>{item.key === "revenue" ? cashValue(value) : number(value)}</div><span className={styles.metricNote}>{loading ? "Đang tải…" : data ? value == null ? "Chưa đủ dữ liệu nguồn" : item.key === "bedOccupancy" ? `Hiện tại · ${number(data.bedSnapshot?.occupied)}/${number(data.bedSnapshot?.active)} giường` : item.key === "revenue" ? "Đã trừ hoàn trả · gồm tạm ứng" : item.key === "currentInpatients" ? "Tại thời điểm chốt" : "Trong kỳ báo cáo" : "Chưa có số liệu nguồn"}</span>
+        <h3>{item.label}</h3><div className={styles.metricValue} aria-label={value == null ? "Chưa có dữ liệu" : undefined} title={item.key === "revenue" ? `${number(value)} VNĐ` : undefined}>{item.key === "revenue" ? cashValue(value) : number(value)}</div><span className={styles.metricNote}>{loading ? "Đang tải…" : data ? value == null ? "Chưa đủ dữ liệu nguồn" : item.key === "bedOccupancy" ? `Hiện tại · ${number(data.bedSnapshot?.occupied)}/${number(data.bedSnapshot?.active)} giường` : item.key === "revenue" ? fptSummary ? "Bảng tham chiếu · trong ngày" : "Thực thu HIS · trong kỳ" : item.key === "currentInpatients" ? "Tại thời điểm chốt" : "Trong kỳ báo cáo" : "Chưa có số liệu nguồn"}</span>
       </article>;
     })}</section>
     <LiveActivityBoard departmentCharts={<HospitalCharts data={data} period={periodName} section="clinical" />} serviceCharts={<HospitalCharts data={data} period={periodName} section="cls" />} key={key} groups={data?.cls?.byServiceGroup ?? []} departments={data?.departments ?? []} updatedAt={data?.generatedAt} updating={refreshing || loading} stale={Boolean(data && refreshError)} />
-    {data && <footer className={styles.reportFooter}><span>Chốt số liệu: {data.asOf.replace("T", " ")} · Bộ nhớ đệm {data.cacheSeconds} giây</span><details><summary>Cách tính số liệu</summary><p>Số liệu tổng hợp từ HIS, cần đối chiếu với báo cáo gốc trước khi dùng làm báo cáo chính thức. Lượt khám tính theo phiếu khám, nhập/xuất viện theo bệnh án có phiếu nhập viện; đang điều trị là số bệnh án chưa ra viện tại thời điểm chốt, không phải tổng trong kỳ. Khoa hiện tại lấy từ lịch sử lưu trú; khoa nhập/xuất theo bệnh án. Công suất giường là tỷ lệ giường đang dùng trên giường không tạm ngưng trong HIS tại thời điểm hiện tại, không phải công suất bình quân ngày giường của kỳ đã chọn. Thực thu gồm chứng từ đã thanh toán và tạm ứng, không hủy, trừ chứng từ hoàn và hoàn hóa đơn theo ngày hoàn; chỉ tính VND. Thực thu theo khoa/phòng được phân theo nơi lập chứng từ.</p>{data.bedSnapshot && <p>Trạng thái giường lúc: {data.bedSnapshot.asOf.replace("T", " ")}</p>}{data.cash && data.cash.invalid === 0 && <p>Đã thu: {number(data.cash.collected)} VNĐ · Hoàn trả: {number(data.cash.refunded)} VNĐ · Thực thu: {number(data.metrics.revenue)} VNĐ</p>}</details></footer>}
+    {data && <footer className={styles.reportFooter}><span>Chốt số liệu: {data.asOf.replace("T", " ")} · Bộ nhớ đệm {data.cacheSeconds} giây</span><details><summary>Cách tính số liệu</summary><p>Số liệu tổng hợp từ HIS, cần đối chiếu với báo cáo gốc trước khi dùng làm báo cáo chính thức. Lượt khám tính theo phiếu khám, nhập/xuất viện theo bệnh án có phiếu nhập viện; đang điều trị là số bệnh án chưa ra viện tại thời điểm chốt, không phải tổng trong kỳ. Khoa hiện tại lấy từ lịch sử lưu trú; khoa nhập/xuất theo bệnh án. Công suất giường là tỷ lệ giường đang dùng trên giường không tạm ngưng trong HIS tại thời điểm hiện tại, không phải công suất bình quân ngày giường của kỳ đã chọn. Tổng doanh thu theo ngày lấy trực tiếp từ bảng tham chiếu FPT; thực thu được tính riêng từ HIS bằng Đã thu trừ Hoàn trả, gồm tạm ứng, không hủy và chỉ tính VND. Thực thu theo khoa/phòng được phân theo nơi lập chứng từ. Tình hình phát thuốc đếm toa chưa hủy theo ngày kê toa, phân loại Toa BHYT và Nhà thuốc, tính Đã phát khi toa nối tới chứng từ có trạng thái xác nhận phát và tính Chờ phát bằng tổng toa trừ số đã phát trong từng nhóm.</p>{data.bedSnapshot && <p>Trạng thái giường lúc: {data.bedSnapshot.asOf.replace("T", " ")}</p>}{data.cash && data.cash.invalid === 0 && <p>{data.fptSummary && <>Tổng doanh thu: {number(data.fptSummary.revenue)} VNĐ · </>}Đã thu: {number(data.cash.collected)} VNĐ · Hoàn trả: {number(data.cash.refunded)} VNĐ · Thực thu sau hoàn trả: {number(data.metrics.revenue)} VNĐ</p>}{data.pharmacy && <p>Tình hình phát thuốc: Tổng toa {number(data.pharmacy.prescriptions)} · Đã phát {number(data.pharmacy.dispensed)} · Chờ phát {number(data.pharmacy.waiting)}</p>}</details></footer>}
   </div>;
 }

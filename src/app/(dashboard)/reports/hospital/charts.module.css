@@ -47,3 +47,56 @@
 @media(max-width:1100px){.embedded .heading h3{font-size:11px}.embedded .plot{height:90px}}
 @media(max-width:680px){.departmentGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.departmentGrid>.card,.departmentGrid>.card:nth-child(n+5){grid-column:span 1}.departmentGrid>.card:last-child{grid-column:1/-1}.serviceGrid{grid-template-columns:minmax(0,1fr)}.embedded .body{min-height:160px}.embedded .plot{height:100px}.embedded .heading h3{font-size:11px}.embedded .ringWrap svg{height:90px}.embedded .readout strong{font-size:22px}}
 @media(max-width:400px){.departmentGrid{grid-template-columns:minmax(0,1fr)}}
+.embedded .heading h3{font-size:12px}
+.embedded .heading p{font-size:10px}
+.embedded .readout{font-size:11px}
+.embedded .readout strong{font-size:21px}
+.embedded .keyValues{font-size:11px}
+.embedded .bars li>div{font-size:11px}
+.embedded .data summary{font-size:11px}
+.embedded .axisText{font-size:11px}
+.clsTabs button{font-size:11px}
+.clsTabs button strong{font-size:16px}
+.pharmacyLabel{font-size:12px}
+.pharmacyLabel strong{font-size:13px}
+.pharmacyTrack span{font-size:13px}
+.pharmacyLegend{font-size:12px}
+@media(max-width:680px){.embedded .heading h3{font-size:12px}.embedded .heading p{font-size:10px}.embedded .readout strong{font-size:22px}.clsTabs button{font-size:10px}.clsTabs button strong{font-size:14px}.pharmacyLabel{font-size:11px}.pharmacyTrack span{font-size:12px}}
+.clsCombined{grid-column:span 2}
+.clsCombined .body{gap:8px}
+.clsOverview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;min-width:0}
+.clsSeries{min-width:0;display:flex;flex-direction:column;gap:8px;padding:8px;border:1px solid color-mix(in srgb,var(--accent) 25%,transparent);border-radius:10px}
+.clsSeries[data-tone=mint]{--accent:#168572;--soft:#eaf9f3}.clsSeries[data-tone=amber]{--accent:#b77316;--soft:#fff6e5}
+.clsSeries h4{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px;margin:0;font-size:11px;color:var(--accent)}
+.clsSeries h4 strong{font-size:16px;font-variant-numeric:tabular-nums}
+.clsSeries .readout{display:none}
+.clsCombined .clsSeries .plot{height:110px}
+.clsCombined[data-expanded=true] .clsSeries .plot{height:220px}
+@media(max-width:680px){.clsOverview{grid-template-columns:minmax(0,1fr)}.clsCombined .clsSeries .plot{height:140px}}
+.clsTabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.clsTabs button{min-width:0;padding:7px 8px;border:1px solid #e0e7ef;border-radius:9px;background:#f8fbff;color:#6d7f94;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:5px;font-size:9px}
+.clsTabs button strong{font-size:14px;font-variant-numeric:tabular-nums;color:#405b78}
+.clsTabs button[data-active=true]{border-color:var(--accent);background:var(--soft);color:var(--accent)}
+.clsTabs button[data-active=true] strong{color:var(--accent)}
+.clsCombined .plot{height:74px}
+.clsCombined[data-expanded=true]{grid-column:1/-1}
+.clsCombined[data-expanded=true] .plot{height:240px}
+@media(max-width:1100px){.clsCombined{grid-column:1/-1}}
+@media(max-width:680px){.clsCombined .plot{height:100px}.clsTabs button{padding:7px 5px;font-size:9px}.clsTabs button strong{font-size:12px}}
+.pharmacyStatus{display:grid;gap:12px}
+.pharmacyLegend{display:flex;justify-content:flex-end;gap:14px;font-size:10px;color:#aebed4}
+.pharmacyLegend span{display:flex;align-items:center;gap:5px}
+.pharmacyLegend i{width:8px;height:8px;border-radius:2px}
+.dispensedDot{background:#66a3ff}.waitingDot{background:#ff6b69}
+.pharmacyRow{display:grid;gap:6px}
+.pharmacyLabel{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:#b3c2d8}
+.pharmacyLabel strong{font-size:11px;color:#dfe8f7;font-variant-numeric:tabular-nums}
+.pharmacyTrack{height:36px;width:100%;display:flex;overflow:hidden;border-radius:7px;background:#26334d}
+.pharmacyTrack span{display:flex;align-items:center;justify-content:center;min-width:0;color:#fff;font-size:11px;font-weight:750;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pharmacyDispensed{background:linear-gradient(90deg,#397ed5,#70a9ff)}
+.pharmacyWaiting{background:linear-gradient(90deg,#ef5d5b,#ff7875)}
+.departmentGrid,.serviceGrid{align-content:start;align-items:stretch;grid-auto-rows:max-content}
+.departmentGrid>.card,.serviceGrid>.card{align-self:stretch}
+.compactBars{flex:none;gap:4px;margin:0}
+.embedded .compactBars li>div{font-size:10px;margin-bottom:2px}
+.embedded .compactBars progress{height:3px}
